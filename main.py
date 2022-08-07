@@ -47,13 +47,16 @@ class Star:
 
 
 class Ship:
-    def __init__(self):
+    def __init__(self, sprite, x, y, w, h, color_key=None, scale=1):
         self.w = 32
         self.h = 32
         self.x = width/2
         self.y = height/2
         self.vx = 0
         self.vy = 0
+        self.color_key = color_key
+        self.scale = scale
+        self.sprite = load_image(sprite, x, y, w, h, color_key, scale)
 
     def move(self):
         self.x += self.vx
@@ -69,11 +72,28 @@ class Ship:
         if(self.y > height):
             self.y = height
 
+    def draw(self):
+        screen.blit(self.sprite, (self.x, self.y))
+
+    def flip_h(self):
+        self.sprite = pygame.transform.flip(self.sprite, True, False)
+        if(self.color_key is not None):
+            self.sprite.set_colorkey(self.color_key)
+
+    def flip_v(self):
+        self.sprite = pygame.transform.flip(self.sprite, False, True)
+        if(self.color_key is not None):
+            self.sprite.set_colorkey(self.color_key)
 
 # load a part of an image from a file to be used as a sprite frame
-def load_image(filename, x1, y1, x2, y2):
+
+
+def load_image(filename, x, y, w, h, color_key=None, scale=1):
     image = pygame.image.load(filename)
-    image = image.subsurface(x1, y1, x2, y2)
+    image = image.subsurface(x, y, x + w, y + h)
+    image = pygame.transform.scale(image, (int(w * scale), int(h * scale)))
+    if(color_key is not None):
+        image.set_colorkey(color_key)
     return image
 
 
@@ -83,6 +103,9 @@ def draw_screen():
     # draw the stars
     for star in stars:
         star.draw()
+
+    # draw the ship
+    player.draw()
 
     # update the screen
     pygame.display.flip()
@@ -98,10 +121,11 @@ done = False
 
 # create a list of stars
 stars = []
-for i in range(100):
+for i in range(300):
+    stars.append(Star())
 
-    star = Star()
-    stars.append(star)
+player = Ship("ships/73180.png", 3, 0, 28, 32, (163, 73, 164), 3)
+player.flip_h()
 
 
 while not done:
