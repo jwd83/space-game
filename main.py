@@ -434,7 +434,7 @@ def update_game():
         player_projectiles = []
         boss.level += 1
         player.level += 1
-        boss.max_hp *= 2
+        boss.max_hp *= 1.5
         boss.hp = boss.max_hp
         player.hp = constrain(player.hp + 10, 0, player.max_hp)
         boss.x = width - 100
