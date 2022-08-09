@@ -224,6 +224,12 @@ def handle_boss_logic():
 def player_shoot():
     global player_projectiles
 
+    boss_x_center = boss.x + boss.w * boss.scale / 2
+    boss_y_center = boss.y + boss.h * boss.scale / 2
+
+    player_x_center = player.x + player.w * player.scale / 2
+    player_y_center = player.y + player.h * player.scale / 2
+
     # perform basic attack
     player_projectiles.append(
         Projectile(
@@ -277,35 +283,42 @@ def player_shoot():
 def boss_shoot():
     global boss_projectiles
 
+    boss_x_center = boss.x + boss.w * boss.scale / 2
+    boss_y_center = boss.y + boss.h * boss.scale / 2
+
+    player_x_center = player.x + player.w * player.scale / 2
+    player_y_center = player.y + player.h * player.scale / 2
+
     # shoot a projectile from the boss straight ahead
-    boss_projectiles.append(
-        Projectile(
-            boss.x + boss.w * boss.scale / 2,
-            boss.y + boss.h * boss.scale / 2,
-            -10,
-            0,
-            5 * boss.level,
-            (255, 0, 255),
-            15
+    if boss.level < 4:
+        boss_projectiles.append(
+            Projectile(
+                boss_x_center,
+                boss_y_center,
+                -10,
+                0,
+                5 * boss.level,
+                (255, 0, 255),
+                15
+            )
         )
-    )
 
     if boss.level >= 2:
         # shoot a projectile from the boss in a random direction towards the player
-        if boss.x > player.x:
+        if boss_x_center > player_x_center:
             vx = random.randint(-5, 1)
         else:
             vx = random.randint(1, 5)
 
-        if boss.y > player.y:
+        if boss_y_center > player_y_center:
             vy = random.randint(-5, 1)
         else:
             vy = random.randint(1, 5)
 
         boss_projectiles.append(
             Projectile(
-                boss.x + boss.w * boss.scale / 2,
-                boss.y + boss.h * boss.scale / 2,
+                boss_x_center,
+                boss_y_center,
                 vx,
                 vy,
                 2 * boss.level,
@@ -318,25 +331,43 @@ def boss_shoot():
     if boss.level >= 3:
         # shoot a projectile from the boss in a random direction towards the player
         # shoot a projectile from the boss in a random direction towards the player
-        if boss.x > player.x:
+        if boss_x_center > player_x_center:
             vx = random.randint(-7, 1)
         else:
             vx = random.randint(1, 7)
 
-        if boss.y > player.y:
+        if boss_y_center > player_y_center:
             vy = random.randint(-7, 1)
         else:
             vy = random.randint(1, 7)
 
         boss_projectiles.append(
             Projectile(
-                boss.x + boss.w * boss.scale / 2,
-                boss.y + boss.h * boss.scale / 2,
+                boss_x_center,
+                boss_y_center,
                 vx,
                 vy,
-                4 * boss.level,
-                (0, 255, 0),
+                3 * boss.level,
+                (255, 255, 0),
                 4
+            )
+        )
+
+    if boss.level >= 4:
+
+        # calculate vx and vy for the projectile to hit the player at their current location
+        vx = (player_x_center - boss_x_center) / 60
+        vy = (player_y_center - boss_y_center) / 60
+
+        boss_projectiles.append(
+            Projectile(
+                boss_x_center,
+                boss_y_center,
+                vx,
+                vy,
+                boss.level,
+                (255, 0, 0),
+                10
             )
         )
 
