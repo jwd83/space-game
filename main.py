@@ -14,8 +14,21 @@ background_speed = 1.0
 frame_counter = 0
 frame_last_shot = 0
 game_state = "title"
+FONT_SIZE_NORMAL = 48
+FONT_SIZE_SMALL = 36
+HEAL_CHANCE = 4
+SHOW_PROJECTILE_VALUES = False
 
 # classes
+
+YELLOW = (255, 255, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+PURPLE = (255, 0, 255)
+GREEN = (0, 255, 0)
+ORANGE = (255, 165, 0)
+LIGHT_BLUE = (0, 255, 255)
+BROWN = (139, 69, 19)
 
 
 class Star:
@@ -70,7 +83,7 @@ class Ship:
         self.max_hp = 300
         self.level = 1
         self.weapon_level = 1
-        self.defense_level = 1
+        self.defense_level = 0
 
     def move(self):
         self.x += self.vx
@@ -111,7 +124,7 @@ class Ship:
 
 
 class Projectile:
-    def __init__(self, x, y, vx, vy, damage, color, radius):
+    def __init__(self, x, y, vx, vy, damage, color, radius, acceleration=1.0):
         self.x = x
         self.y = y
         self.vx = vx
@@ -119,8 +132,14 @@ class Projectile:
         self.damage = damage
         self.color = color
         self.radius = radius
+        self.acceleration = acceleration
 
     def move(self):
+
+        if frame_counter % 2 == 0:
+            self.vx *= self.acceleration
+            self.vy *= self.acceleration
+
         self.x += self.vx
         self.y += self.vy
 
@@ -130,8 +149,19 @@ class Projectile:
             return False
 
     def draw(self):
-        pygame.draw.circle(screen, self.color,
-                           (self.x, self.y), self.radius)
+        # if my damage is negative (healing), draw a green circle
+        if(self.damage < 0):
+            pygame.draw.circle(screen, GREEN, (self.x, self.y), self.radius)
+        # otherwise, draw my circle normally
+        else:
+
+            pygame.draw.circle(screen, self.color,
+                               (self.x, self.y), self.radius)
+
+        if SHOW_PROJECTILE_VALUES:
+            text_damage_value = font_small.render(
+                str(self.damage), True, (255, 255, 255))
+            screen.blit(text_damage_value, (self.x, self.y + self.radius))
 
 
 def load_image(filename, x, y, w, h, color_key=None, scale=1):
@@ -216,7 +246,7 @@ def handle_boss_logic():
         boss.vy = constrain(boss.vy, -5, 5)
 
     # control the bosses shooting
-    if(frame_counter % 10 == 0):
+    if(frame_counter % 13 - boss.level == 0):
         if (random.randint(0, 100) < 50):
             boss_shoot()
 
@@ -238,20 +268,20 @@ def player_shoot():
             20,
             0,
             1+player.weapon_level,
-            (0, 0, 255),
-            3
+            BLUE,
+            5
         )
     )
 
     # player level 2 weapon
     if player.weapon_level >= 2:
         # aim vx and vy at the boss
-        if player.x > boss.x:
+        if player_x_center > boss_x_center:
             vx = random.randint(-20, 0)
         else:
             vx = random.randint(0, 20)
 
-        if player.y > boss.y:
+        if player_y_center > boss_y_center:
             vy = random.randint(-20, 0)
         else:
             vy = random.randint(0, 20)
@@ -273,9 +303,29 @@ def player_shoot():
                 player.y + player.h * player.scale / 2,
                 vx,
                 vy,
-                1,
-                (0, 255, 255),
-                3
+                player.weapon_level - 1,
+                PURPLE,
+                4
+            )
+        )
+
+    # player level 3 weapon
+    if player.weapon_level >= 3:
+
+        vx = boss_x_center - player_x_center
+        vy = boss_y_center - player_y_center
+        nvx = vx / math.sqrt(vx * vx + vy * vy) * 10
+        nvy = vy / math.sqrt(vx * vx + vy * vy) * 10
+
+        player_projectiles.append(
+            Projectile(
+                player.x + player.w * player.scale / 2,
+                player.y + player.h * player.scale / 2,
+                nvx,
+                nvy,
+                player.weapon_level - 2,
+                BLUE,
+                constrain(player.weapon_level, 0, 10)
             )
         )
 
@@ -297,13 +347,13 @@ def boss_shoot():
                 boss_y_center,
                 -10,
                 0,
-                5 * boss.level,
-                (255, 0, 255),
+                3 * boss.level * boss_shoot_random_heal(),
+                YELLOW,
                 15
             )
         )
 
-    if boss.level >= 2:
+    if boss.level == 2:
         # shoot a projectile from the boss in a random direction towards the player
         if boss_x_center > player_x_center:
             vx = random.randint(-5, 1)
@@ -321,9 +371,9 @@ def boss_shoot():
                 boss_y_center,
                 vx,
                 vy,
-                2 * boss.level,
-                (255, 180, 0),
-                7
+                boss.level * boss_shoot_random_heal(),
+                ORANGE,
+                10
 
             )
         )
@@ -347,29 +397,58 @@ def boss_shoot():
                 boss_y_center,
                 vx,
                 vy,
-                3 * boss.level,
-                (255, 255, 0),
-                4
+                2 * boss.level * boss_shoot_random_heal(),
+                ORANGE,
+                10
             )
         )
 
     if boss.level >= 4:
-
-        # calculate vx and vy for the projectile to hit the player at their current location
-        vx = (player_x_center - boss_x_center) / 60
-        vy = (player_y_center - boss_y_center) / 60
+        # target the player directly
+        vx = player_x_center - boss_x_center
+        vy = player_y_center - boss_y_center
+        nvx = vx / math.sqrt(vx * vx + vy * vy) * 6
+        nvy = vy / math.sqrt(vx * vx + vy * vy) * 6
 
         boss_projectiles.append(
             Projectile(
                 boss_x_center,
                 boss_y_center,
-                vx,
-                vy,
-                boss.level,
-                (255, 0, 0),
+                nvx,
+                nvy,
+                boss.level * boss_shoot_random_heal(),
+                (180, 50, 50),
                 10
             )
         )
+
+    if boss.level >= 5:
+        # target the player directly
+        vx = player_x_center - boss_x_center
+        vy = player_y_center - boss_y_center
+        nvx = vx / math.sqrt(vx * vx + vy * vy) * (boss.level - 3)
+        nvy = vy / math.sqrt(vx * vx + vy * vy) * (boss.level - 3)
+
+        boss_projectiles.append(
+            Projectile(
+                boss_x_center,
+                boss_y_center,
+                nvx,
+                nvy,
+                boss.level * boss_shoot_random_heal(),
+                RED,
+                10,
+                1.05
+            )
+        )
+
+
+def boss_shoot_random_heal():
+    # a random % chance shoot a heal projectile instead of a damage one
+    if random.randint(0, 100) < HEAL_CHANCE:
+        return -1
+    else:
+        return 1
 
 
 def projectile_hits_ship(projectile, ship):
@@ -418,8 +497,11 @@ def collide():
         if(projectile_hits_ship(projectile, player)):
             # play the boss hit sound effect
             pygame.mixer.Sound.play(sound_boss_hit)
-            player.hp -= projectile.damage
+            player.hp -= projectile.damage - player.defense_level
             boss_projectiles.remove(projectile)
+
+    # cap the player at double their max hp
+    player.hp = constrain(player.hp, -player.max_hp, player.max_hp * 2)
 
 
 def update_game():
@@ -538,15 +620,33 @@ def draw_screen():
         (
             player.x,
             player.y + player.h * player.scale,
-            (player.w * player.scale) * (player.hp / player.max_hp),
+            (player.w * player.scale) *
+            (constrain(player.hp, 0, player.max_hp) / player.max_hp),
             10
         )
     )
+
+    # draw the players shield level bar on the screen below the player
+    if player.hp > player.max_hp:
+        pygame.draw.rect(
+            screen,
+            BLUE,
+            (
+                player.x,
+                player.y + player.h * player.scale + 11,
+                (player.w * player.scale) *
+                ((player.hp - player.max_hp) / player.max_hp),
+                10
+            )
+        )
+
     # draw the score line
     text_score_line = font.render(
         "Level: " + str(player.level) +
         "  Weapon: " + str(player.weapon_level) +
-        "  HP: " + str(player.hp) + "/" + str(player.max_hp), True, (255, 255, 255))
+        "  Defense: " + str(player.defense_level) +
+        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp) +
+        "  Boss HP: " + "{:0.0f}".format(boss.hp) + "/" + "{:0.0f}".format(boss.max_hp), True, (255, 255, 255))
 
     screen.blit(text_score_line, (0, 680))
 
@@ -695,7 +795,8 @@ pygame.display.set_caption(
 print("Screen setup complete.")
 
 print("Generating font objects...")
-font = pygame.font.SysFont(None, 48)
+font = pygame.font.SysFont(None, FONT_SIZE_NORMAL)
+font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
 text_title_start = font.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_quit_key = font.render('[escape] TO QUIT', True, (255, 255, 255))
