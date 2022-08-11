@@ -14,6 +14,8 @@ background_speed = 1.0
 frame_counter = 0
 frame_last_shot = 0
 game_state = "title"
+last_game_state = "title"
+state_start_frame = 0
 FONT_SIZE_NORMAL = 48
 FONT_SIZE_SMALL = 36
 HEAL_CHANCE = 4
@@ -254,191 +256,173 @@ def handle_boss_logic():
 def player_shoot():
     global player_projectiles
 
-    boss_x_center = boss.x + boss.w * boss.scale / 2
-    boss_y_center = boss.y + boss.h * boss.scale / 2
-
-    player_x_center = player.x + player.w * player.scale / 2
-    player_y_center = player.y + player.h * player.scale / 2
-
     # perform basic attack
     player_projectiles.append(
-        Projectile(
-            player.x + player.w * player.scale / 2,
-            player.y + player.h * player.scale / 2,
-            20,
-            0,
+        fire_projectile(
+            player,
+            boss,
+            1,
             1+player.weapon_level,
-            BLUE,
-            5
+            (100, 100, 255),
+            6,
+            20
         )
     )
 
-    # player level 2 weapon
+    # player level 2 weapon: quadrant attack
     if player.weapon_level >= 2:
-        # aim vx and vy at the boss
-        if player_x_center > boss_x_center:
-            vx = random.randint(-20, 0)
-        else:
-            vx = random.randint(0, 20)
-
-        if player_y_center > boss_y_center:
-            vy = random.randint(-20, 0)
-        else:
-            vy = random.randint(0, 20)
-
-        if abs(vx) > abs(vy):
-            if vy >= 0:
-                vy = 20 - abs(vx)
-            else:
-                vy = -20 + abs(vx)
-        else:
-            if vx >= 0:
-                vx = 20 - abs(vy)
-            else:
-                vx = -20 + abs(vy)
-
+        # perform basic attack
         player_projectiles.append(
-            Projectile(
-                player.x + player.w * player.scale / 2,
-                player.y + player.h * player.scale / 2,
-                vx,
-                vy,
-                player.weapon_level - 1,
-                PURPLE,
-                4
+            fire_projectile(
+                player,
+                boss,
+                2,
+                player.weapon_level,
+                (25, 150, 255),
+                6,
+                20
             )
         )
 
-    # player level 3 weapon
+    # player level 3 weapon: target attack
     if player.weapon_level >= 3:
-
-        vx = boss_x_center - player_x_center
-        vy = boss_y_center - player_y_center
-        nvx = vx / math.sqrt(vx * vx + vy * vy) * 10
-        nvy = vy / math.sqrt(vx * vx + vy * vy) * 10
-
+        # perform basic attack
         player_projectiles.append(
-            Projectile(
-                player.x + player.w * player.scale / 2,
-                player.y + player.h * player.scale / 2,
-                nvx,
-                nvy,
-                player.weapon_level - 2,
-                BLUE,
-                constrain(player.weapon_level, 0, 10)
+            fire_projectile(
+                player,
+                boss,
+                3,
+                player.weapon_level-1,
+                (0, 255, 255),
+                6,
+                20
             )
         )
+
+
+def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.0, can_heal=False):
+    source_x_center = source.x + source.w * source.scale / 2
+    source_y_center = source.y + source.h * source.scale / 2
+
+    target_x_center = target.x + target.w * target.scale / 2
+    target_y_center = target.y + target.h * target.scale / 2
+
+    vx = 0
+    vy = 0
+
+    # mode 1: horizontal shot towards target
+    if mode == 1:
+        if source_x_center > target_x_center:
+            vx = -speed
+        else:
+            vx = speed
+
+    # mode 2: quadrant spray
+    if mode == 2:
+        if source_x_center > target_x_center:
+            vx = random.random() * -speed
+        else:
+            vx = random.random() * speed
+
+        if source_y_center > target_y_center:
+            vy = random.random() * -speed
+        else:
+            vy = random.random() * speed
+
+        while (abs(vx) + abs(vy) < speed / 1.5):
+            vx *= 2
+            vy *= 2
+
+    # mode 3: auto-aim
+    if mode == 3:
+        dx = target_x_center - source_x_center
+        dy = target_y_center - source_y_center
+        drt = math.sqrt(dx * dx + dy * dy)
+        if drt != 0:
+            vx = dx / drt * speed
+            vy = dy / drt * speed
+        else:
+            # if the target is the same as the source, just shoot straight
+            vx = speed
+            vy = 0
+
+    # check if this shot will be a heal
+    if can_heal:
+        damage *= boss_shoot_random_heal()
+
+    # return the custom projectile
+    return Projectile(
+        source_x_center,
+        source_y_center,
+        vx,
+        vy,
+        damage,
+        color,
+        radius,
+        accel,
+
+    )
 
 
 def boss_shoot():
-    global boss_projectiles
-
-    boss_x_center = boss.x + boss.w * boss.scale / 2
-    boss_y_center = boss.y + boss.h * boss.scale / 2
-
-    player_x_center = player.x + player.w * player.scale / 2
-    player_y_center = player.y + player.h * player.scale / 2
+    # global boss_projectiles
 
     # shoot a projectile from the boss straight ahead
-    if boss.level < 4:
-        boss_projectiles.append(
-            Projectile(
-                boss_x_center,
-                boss_y_center,
-                -10,
-                0,
-                3 * boss.level * boss_shoot_random_heal(),
-                YELLOW,
-                15
-            )
+    boss_projectiles.append(
+        fire_projectile(
+            boss,
+            player,
+            1,
+            5 + boss.level,
+            YELLOW,
+            15,
+            10,
+            can_heal=True
         )
+    )
 
-    if boss.level == 2:
-        # shoot a projectile from the boss in a random direction towards the player
-        if boss_x_center > player_x_center:
-            vx = random.randint(-5, 1)
-        else:
-            vx = random.randint(1, 5)
-
-        if boss_y_center > player_y_center:
-            vy = random.randint(-5, 1)
-        else:
-            vy = random.randint(1, 5)
-
+    if boss.level >= 2:
         boss_projectiles.append(
-            Projectile(
-                boss_x_center,
-                boss_y_center,
-                vx,
-                vy,
-                boss.level * boss_shoot_random_heal(),
+            fire_projectile(
+                boss,
+                player,
+                2,
+                2 + boss.level,
                 ORANGE,
-                10
-
+                10,
+                6,
+                can_heal=True
             )
         )
 
     if boss.level >= 3:
-        # shoot a projectile from the boss in a random direction towards the player
-        # shoot a projectile from the boss in a random direction towards the player
-        if boss_x_center > player_x_center:
-            vx = random.randint(-7, 1)
-        else:
-            vx = random.randint(1, 7)
-
-        if boss_y_center > player_y_center:
-            vy = random.randint(-7, 1)
-        else:
-            vy = random.randint(1, 7)
-
+        # target the player directly
         boss_projectiles.append(
-            Projectile(
-                boss_x_center,
-                boss_y_center,
-                vx,
-                vy,
-                2 * boss.level * boss_shoot_random_heal(),
-                ORANGE,
-                10
+            fire_projectile(
+                boss,
+                player,
+                3,
+                boss.level,
+                RED,
+                10,
+                7,
+                can_heal=True
             )
         )
 
     if boss.level >= 4:
-        # target the player directly
-        vx = player_x_center - boss_x_center
-        vy = player_y_center - boss_y_center
-        nvx = vx / math.sqrt(vx * vx + vy * vy) * 6
-        nvy = vy / math.sqrt(vx * vx + vy * vy) * 6
-
+        # mode 3 with acceleration
         boss_projectiles.append(
-            Projectile(
-                boss_x_center,
-                boss_y_center,
-                nvx,
-                nvy,
-                boss.level * boss_shoot_random_heal(),
-                (180, 50, 50),
-                10
-            )
-        )
-
-    if boss.level >= 5:
-        # target the player directly
-        vx = player_x_center - boss_x_center
-        vy = player_y_center - boss_y_center
-        nvx = vx / math.sqrt(vx * vx + vy * vy) * (boss.level - 3)
-        nvy = vy / math.sqrt(vx * vx + vy * vy) * (boss.level - 3)
-
-        boss_projectiles.append(
-            Projectile(
-                boss_x_center,
-                boss_y_center,
-                nvx,
-                nvy,
-                boss.level * boss_shoot_random_heal(),
-                RED,
+            fire_projectile(
+                boss,
+                player,
+                3,
+                boss.level,
+                PURPLE,
                 10,
-                1.05
+                speed=5,
+                can_heal=True,
+                accel=1.05
             )
         )
 
@@ -496,7 +480,12 @@ def collide():
         # if(projectile.x > player.x and projectile.x < player.x + player.w * player.scale and projectile.y > player.y and projectile.y < player.y + player.h * player.scale):
         if(projectile_hits_ship(projectile, player)):
             # play the boss hit sound effect
-            pygame.mixer.Sound.play(sound_boss_hit)
+
+            if projectile.damage < 0:
+                pygame.mixer.Sound.play(sound_player_heal)
+            else:
+                pygame.mixer.Sound.play(sound_boss_hit)
+
             player.hp -= projectile.damage - player.defense_level
             boss_projectiles.remove(projectile)
 
@@ -539,9 +528,9 @@ def update_game():
     # check for level up
     if boss.hp <= 0:
         # play the boss death sound
-        pygame.mixer.Sound.play(sound_boss_death)
+        pygame.mixer.Sound.play(sound_level_up)
 
-        game_state = "level_up"
+        game_state = "victory"
         # clear active projectiles from the board
         boss_projectiles = []
         player_projectiles = []
@@ -550,8 +539,6 @@ def update_game():
         boss.max_hp *= 1.5
         boss.hp = boss.max_hp
         player.hp = constrain(player.hp + 10, 0, player.max_hp)
-        boss.x = width - 100
-        boss.y = height / 2 - 100
 
     # background_speed *= 1.04
     # if background_speed > 8:
@@ -685,6 +672,71 @@ def run_title_screen():
     pygame.display.flip()
 
 
+def run_victory_screen():
+    global game_state, background_speed
+
+    handle_game_events()
+
+    # draw a starry background
+    screen.fill((0, 0, 0))
+
+    move_starfield()
+
+    # draw the stars
+    for star in stars:
+        star.draw()
+
+    if (state_current_frame() / 10 % 2 == 1) and state_current_frame() < 100:
+        boss.draw()
+
+    # animate the player charging engines and zooming off
+    if state_current_frame() == 0:
+        player.vx = (125 - player.x) / 150
+        player.vy = (height / 2 - player.y) / 150
+
+    if state_current_frame() == 150:
+        player.vx = -1
+        player.vy = 0
+
+    if state_current_frame() > 150:
+        background_speed = constrain(background_speed * 0.99, 0.1, 8)
+        # draw a circle expanding out from behind the player
+        pygame.draw.circle(
+            screen,
+            (255, 255, 255),
+            (player.x, player.y + player.h * player.scale / 2),
+            3 + (state_current_frame() - 150) / 8
+        )
+
+    if state_current_frame() < 270:
+        player.move()
+
+    if state_current_frame() > 270:
+        player.x = width * 3
+        background_speed = 4
+        # draw a white box where the player left off from across the screen
+        pygame.draw.rect(
+            screen,
+            (255, 255, 255),
+            (
+                0,
+                player.y,
+                width,
+                player.h * player.scale
+            )
+        )
+
+    # end the animation and go to the level up screen
+    if state_current_frame() >= 300:
+        game_state = "level_up"
+
+    # draw the player
+    player.draw()
+
+    # update the screen
+    pygame.display.flip()
+
+
 def run_game_over_screen():
     global game_state, player, boss
 
@@ -732,7 +784,7 @@ def run_game_over_screen():
 
 
 def run_level_up_screen():
-    global game_state, player, boss
+    global game_state, player, boss, background_speed
 
     handle_game_events()
 
@@ -771,6 +823,7 @@ def run_level_up_screen():
 
     # check for a key press of either enter or tab to start the next level
     if keys[pygame.K_RETURN] or keys[pygame.K_TAB]:
+        background_speed = 1
         player.x = 100
         player.y = height / 2 - player.h * player.scale / 2
         boss.x = width - boss.w * boss.scale - 100
@@ -783,6 +836,10 @@ def run_level_up_screen():
 
     # update the screen
     pygame.display.flip()
+
+
+def state_current_frame():
+    return frame_counter - state_start_frame
 
 
 # start the game
@@ -812,7 +869,10 @@ print("Loading sounds...")
 sound_player_hit = pygame.mixer.Sound('sounds/player_hit.wav')
 sound_player_death = pygame.mixer.Sound('sounds/player_death.wav')
 sound_boss_hit = pygame.mixer.Sound('sounds/boss_hit.wav')
-sound_boss_death = pygame.mixer.Sound('sounds/boss_death.wav')
+sound_player_heal = pygame.mixer.Sound('sounds/player_heal.wav')
+# sound_boss_death = pygame.mixer.Sound('sounds/boss_death.wav')
+sound_level_up = pygame.mixer.Sound('sounds/level_up.wav')
+
 
 print("Initializing game clock...")
 clock = pygame.time.Clock()
@@ -836,11 +896,12 @@ player.x = 100
 
 
 # boss = Ship("ships/)
-boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
+# boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
+boss = Ship("ships/dvd.png", 1, 1, 1600, 740, None, 0.2)
 boss.max_hp = 100
 boss.hp = boss.max_hp
 
-boss.flip_h()
+# boss.flip_h()
 boss.x = 1000
 boss.y = height/2
 
@@ -855,6 +916,9 @@ while not done:
         update_game()
         draw_screen()
 
+    elif game_state == "victory":
+        run_victory_screen()
+
     elif game_state == "level_up":
         run_level_up_screen()
 
@@ -866,6 +930,11 @@ while not done:
 
     # increment the frame counter
     frame_counter += 1
+
+    # if the game state changes record the frame counter
+    if game_state != last_game_state:
+        last_game_state = game_state
+        state_start_frame = frame_counter
 
     # console the frame rate
     if(frame_counter % 100 == 0):
