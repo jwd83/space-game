@@ -86,6 +86,7 @@ class Ship:
         self.level = 1
         self.weapon_level = 1
         self.defense_level = 0
+        self.name = ""
 
     def move(self):
         self.x += self.vx
@@ -108,6 +109,15 @@ class Ship:
             edge_hit = True
 
         return edge_hit
+
+    def change_sprite(self, sprite, x, y, w, h, color_key=None, scale=1):
+        self.w = w
+        self.h = h
+        self.scale = scale
+        self.color_key = color_key
+        self.sprite = load_image(sprite, x, y, w, h, color_key, scale)
+        if(self.color_key is not None):
+            self.sprite.set_colorkey(self.color_key)
 
     def draw(self):
         screen.blit(self.sprite, (self.x, self.y))
@@ -633,7 +643,7 @@ def draw_screen():
         "  Weapon: " + str(player.weapon_level) +
         "  Defense: " + str(player.defense_level) +
         "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp) +
-        "  Boss HP: " + "{:0.0f}".format(boss.hp) + "/" + "{:0.0f}".format(boss.max_hp), True, (255, 255, 255))
+        "  Boss [" + boss.name + "] HP: " + "{:0.0f}".format(boss.hp) + "/" + "{:0.0f}".format(boss.max_hp), True, (255, 255, 255))
 
     screen.blit(text_score_line, (0, 680))
 
@@ -658,6 +668,10 @@ def run_title_screen():
     screen.blit(text_title_start,
                 (width / 2 - text_title_start.get_width()/2,
                  height / 2 - text_title_start.get_height()/2))
+
+    screen.blit(text_title_heading,
+                (width / 2 - text_title_heading.get_width()/2,
+                 height / 2 - text_title_heading.get_height()/2 - 100))
 
     # check for key press of space
     keys = pygame.key.get_pressed()
@@ -729,12 +743,45 @@ def run_victory_screen():
     # end the animation and go to the level up screen
     if state_current_frame() >= 300:
         game_state = "level_up"
+        load_boss()
 
     # draw the player
     player.draw()
 
     # update the screen
     pygame.display.flip()
+
+
+def load_boss():
+    global boss
+
+    sprite_selector = boss.level % 4
+
+    if sprite_selector == 0:
+        boss.name = "Roy Carnassus"
+        boss.change_sprite("ships/ships_3.png", 1, 300,
+                           310, 140, (38, 37, 37), 1)
+        boss.flip_h()
+    elif sprite_selector == 1:
+        boss.name = "Morpha"
+        boss.change_sprite("ships/ships_3.png", 1, 1,
+                           310, 150, (38, 37, 37), 1)
+        boss.flip_h()
+    elif sprite_selector == 2:
+        boss.name = "DVD Dreadnaught"
+        boss.change_sprite("ships/dvd.png", 1, 1, 1600, 740, None, 0.2)
+
+    elif sprite_selector == 3:
+        boss.name = "Odin"
+        boss.change_sprite("ships/ships_3.png", 1, 450,
+                           310, 140, (38, 37, 37), 1)
+        boss.flip_h()
+
+    elif sprite_selector == 4:
+        boss.name = "Alexander"
+        boss.change_sprite("ships/ships_3.png", 1, 150,
+                           310, 150, (38, 37, 37), 1)
+        boss.flip_h()
 
 
 def run_game_over_screen():
@@ -854,6 +901,8 @@ print("Screen setup complete.")
 print("Generating font objects...")
 font = pygame.font.SysFont(None, FONT_SIZE_NORMAL)
 font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+text_title_heading = font.render(
+    "The Hunt for Roy Carnassus", True, (255, 255, 255))
 text_title_start = font.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_quit_key = font.render('[escape] TO QUIT', True, (255, 255, 255))
@@ -896,10 +945,13 @@ player.x = 100
 
 
 # boss = Ship("ships/)
-# boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
-boss = Ship("ships/dvd.png", 1, 1, 1600, 740, None, 0.2)
+boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
+boss.level = 1
 boss.max_hp = 100
 boss.hp = boss.max_hp
+load_boss()
+# boss.flip_h()
+# boss.name = "Spike"
 
 # boss.flip_h()
 boss.x = 1000
