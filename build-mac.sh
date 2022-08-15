@@ -12,3 +12,4 @@ cp -rfv ships dist/
 cp -rfv sounds dist/
 
 
+zip -r macos.zip dist
