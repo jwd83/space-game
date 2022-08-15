@@ -145,8 +145,17 @@ class Projectile:
         self.color = color
         self.radius = radius
         self.acceleration = acceleration
+        self.hit = False
 
     def move(self):
+
+        if self.hit:
+            self.vx = 0.95 * self.vx
+            self.vy = 0.95 * self.vy
+            if abs(self.vx) < 2 and abs(self.vy) < 2:
+                self.vx = 0
+                self.vy = 0
+                return True
 
         if frame_counter % 2 == 0:
             self.vx *= self.acceleration
@@ -161,19 +170,27 @@ class Projectile:
             return False
 
     def draw(self):
-        # if my damage is negative (healing), draw a green circle
-        if(self.damage < 0):
-            pygame.draw.circle(screen, GREEN, (self.x, self.y), self.radius)
-        # otherwise, draw my circle normally
+        if not self.hit:
+
+            if(self.damage < 0):
+                # if my damage is negative (healing), draw a green circle
+                pygame.draw.circle(
+                    screen, GREEN, (self.x, self.y), self.radius)
+            else:
+                # otherwise, draw my circle normally
+                pygame.draw.circle(screen, self.color,
+                                   (self.x, self.y), self.radius)
         else:
+            if(self.damage < 0):
+                # if my damage is negative (healing), draw a green value
+                text_damage_value = font_small.render(
+                    "+" + str(abs(self.damage)), True, GREEN)
 
-            pygame.draw.circle(screen, self.color,
-                               (self.x, self.y), self.radius)
-
-        if SHOW_PROJECTILE_VALUES:
-            text_damage_value = font_small.render(
-                str(self.damage), True, (255, 255, 255))
-            screen.blit(text_damage_value, (self.x, self.y + self.radius))
+            else:
+                # otherwise, draw my damage value normally
+                text_damage_value = font_small.render(
+                    str(self.damage), True, self.color)
+            screen.blit(text_damage_value, (self.x, self.y))
 
 
 def load_image(filename, x, y, w, h, color_key=None, scale=1):
@@ -238,11 +255,14 @@ def handle_game_events():
                 done = True
 
 
+# set to none if you do not wish to constrain
 def constrain(value, low, high):
-    if(value < low):
-        value = low
-    if(value > high):
-        value = high
+    if low is not None:
+        if(value < low):
+            value = low
+    if high is not None:
+        if(value > high):
+            value = high
     return value
 
 
@@ -272,7 +292,7 @@ def player_shoot():
             player,
             boss,
             1,
-            1+player.weapon_level,
+            1+(player.weapon_level*2),
             (100, 100, 255),
             6,
             20
@@ -294,7 +314,7 @@ def player_shoot():
             )
         )
 
-    # player level 3 weapon: target attack
+    # player level 3 weapon: targeted attack
     if player.weapon_level >= 3:
         # perform basic attack
         player_projectiles.append(
@@ -303,7 +323,7 @@ def player_shoot():
                 boss,
                 3,
                 player.weapon_level-1,
-                (0, 255, 255),
+                (255, 255, 255),
                 6,
                 20
             )
@@ -478,26 +498,32 @@ def collide():
     for projectile in player_projectiles:
         # check if the projectile x y is within the boss x y + w h
         #        if(projectile.x > boss.x and projectile.x < boss.x + boss.w * boss.scale and projectile.y > boss.y and projectile.y < boss.y + boss.h * boss.scale):
-        if(projectile_hits_ship(projectile, boss)):
-            # play the player hit sound
-            pygame.mixer.Sound.play(sound_player_hit)
-            boss.hp -= projectile.damage
-            player_projectiles.remove(projectile)
+        if not projectile.hit:
+            if(projectile_hits_ship(projectile, boss)):
+                # play the player hit sound
+                pygame.mixer.Sound.play(sound_player_hit)
+                boss.hp -= projectile.damage
+                # player_projectiles.remove(projectile)
+                projectile.hit = True
 
     # collide boss projectiles with the player
     for projectile in boss_projectiles:
         # check if the projectile x y is within the player x y + w h
         # if(projectile.x > player.x and projectile.x < player.x + player.w * player.scale and projectile.y > player.y and projectile.y < player.y + player.h * player.scale):
-        if(projectile_hits_ship(projectile, player)):
-            # play the boss hit sound effect
+        if not projectile.hit:
+            if(projectile_hits_ship(projectile, player)):
+                # play the boss hit sound effect
 
-            if projectile.damage < 0:
-                pygame.mixer.Sound.play(sound_player_heal)
-            else:
-                pygame.mixer.Sound.play(sound_boss_hit)
+                if projectile.damage < 0:
+                    pygame.mixer.Sound.play(sound_player_heal)
+                else:
+                    pygame.mixer.Sound.play(sound_boss_hit)
+                    projectile.damage -= player.defense_level
 
-            player.hp -= projectile.damage - player.defense_level
-            boss_projectiles.remove(projectile)
+                player.hp -= projectile.damage
+
+                # boss_projectiles.remove(projectile)
+                projectile.hit = True
 
     # cap the player at double their max hp
     player.hp = constrain(player.hp, -player.max_hp, player.max_hp * 2)
@@ -532,7 +558,7 @@ def update_game():
         pygame.mixer.Sound.play(sound_player_death)
         player.hp = 0
         game_state = "game_over"
-        boss_projectiles = []
+        # boss_projectiles = []
         player_projectiles = []
 
     # check for level up
@@ -543,7 +569,7 @@ def update_game():
         game_state = "victory"
         # clear active projectiles from the board
         boss_projectiles = []
-        player_projectiles = []
+        # player_projectiles = []
         boss.level += 1
         player.level += 1
         boss.max_hp *= 1.5
@@ -555,19 +581,7 @@ def update_game():
     #     background_speed = 8
 
 
-def draw_screen():
-    # draw a starry background
-    screen.fill((0, 0, 0))
-    # draw the stars
-    for star in stars:
-        star.draw()
-
-    # draw the ship
-    player.draw()
-
-    # draw the boss
-    boss.draw()
-
+def draw_projectiles():
     # draw the player projectiles
     for projectile in player_projectiles:
         projectile.draw()
@@ -575,6 +589,22 @@ def draw_screen():
     # draw the boss projectiles
     for projectile in boss_projectiles:
         projectile.draw()
+
+
+def draw_screen():
+    # draw a starry background
+    screen.fill((0, 0, 0))
+    # draw the stars
+    draw_starfield()
+
+    # draw the ship
+    player.draw()
+
+    # draw the boss
+    boss.draw()
+
+    # draw the projectiles
+    draw_projectiles()
 
     # draw the boss hp as a bar on the screen below the boss
     pygame.draw.rect(
@@ -642,10 +672,19 @@ def draw_screen():
         "Level: " + str(player.level) +
         "  Weapon: " + str(player.weapon_level) +
         "  Defense: " + str(player.defense_level) +
-        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp) +
-        "  Boss [" + boss.name + "] HP: " + "{:0.0f}".format(boss.hp) + "/" + "{:0.0f}".format(boss.max_hp), True, (255, 255, 255))
+        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp), True, (255, 255, 255))
+
+    # draw your shield level
+    if player.hp > player.max_hp:
+        text_shield_level = font.render(
+            "+ " + str(player.hp-player.max_hp), True, (100, 100, 255))
+        screen.blit(text_shield_level, (text_score_line.get_width() + 10, 680))
+
+    text_boss_line = font.render(
+        boss.name + " HP: " + "{:0.0f}".format(boss.hp), True, (255, 100, 100))
 
     screen.blit(text_score_line, (0, 680))
+    screen.blit(text_boss_line, (width - text_boss_line.get_width(), 680))
 
     # update the screen
     pygame.display.flip()
@@ -687,18 +726,17 @@ def run_title_screen():
 
 
 def run_victory_screen():
-    global game_state, background_speed
-
+    global game_state, background_speed, player_projectiles
     handle_game_events()
 
     # draw a starry background
     screen.fill((0, 0, 0))
 
     move_starfield()
+    move_projectiles()
 
-    # draw the stars
-    for star in stars:
-        star.draw()
+    draw_starfield()
+    draw_projectiles()
 
     if (state_current_frame() / 10 % 2 == 1) and state_current_frame() < 100:
         boss.draw()
@@ -714,6 +752,7 @@ def run_victory_screen():
 
     if state_current_frame() > 150:
         background_speed = constrain(background_speed * 0.99, 0.1, 8)
+        player_projectiles = []
         # draw a circle expanding out from behind the player
         pygame.draw.circle(
             screen,
@@ -727,7 +766,7 @@ def run_victory_screen():
 
     if state_current_frame() > 270:
         player.x = width * 3
-        background_speed = 4
+        background_speed = 7
         # draw a white box where the player left off from across the screen
         pygame.draw.rect(
             screen,
@@ -756,6 +795,7 @@ def load_boss():
     global boss
 
     sprite_selector = boss.level % 5
+    boss_name_mark = constrain(math.floor((boss.level - 1) / 5) + 1, 0, None)
 
     if sprite_selector == 0:
         boss.name = "Roy Carnassus"
@@ -783,9 +823,40 @@ def load_boss():
                            310, 140, (38, 37, 37), 1)
         boss.flip_h()
 
+    if boss_name_mark > 1:
+        boss.name += " Mk " + get_roman_numeral(boss_name_mark)
+
+
+def get_roman_numeral(number):
+    num = [1, 4, 5, 9, 10, 40, 50, 90,
+           100, 400, 500, 900, 1000]
+    sym = ["I", "IV", "V", "IX", "X", "XL",
+           "L", "XC", "C", "CD", "D", "CM", "M"]
+    i = 12
+
+    str_out = ""
+
+    while number:
+        div = number // num[i]
+        number %= num[i]
+
+        while div:
+            str_out += sym[i]
+            # print(sym[i], end = "")
+            div -= 1
+        i -= 1
+
+    return str_out
+
+
+def draw_starfield():
+    # draw the stars
+    for star in stars:
+        star.draw()
+
 
 def run_game_over_screen():
-    global game_state, player, boss
+    global game_state, player, boss, boss_projectiles
 
     handle_game_events()
 
@@ -793,10 +864,15 @@ def run_game_over_screen():
     screen.fill((0, 0, 0))
 
     move_starfield()
+    draw_starfield()
 
-    # draw the stars
-    for star in stars:
-        star.draw()
+    boss.vx = 1
+    boss.vy = 0
+    boss.draw()
+
+    # draw the projectiles
+    move_projectiles()
+    draw_projectiles()
 
     screen.blit(text_ship_destroyed,
                 (width / 2 - text_ship_destroyed.get_width()/2,
@@ -819,7 +895,7 @@ def run_game_over_screen():
         player.y = height / 2 - player.h * player.scale / 2
         boss.x = width - boss.w * boss.scale - 100
         boss.y = height / 2 - boss.h * boss.scale / 2
-
+        boss_projectiles = []
         game_state = "game"
 
     # check for a key press of escape
