@@ -3,6 +3,8 @@
 # sprite resources: https://www.spriters-resource.com/snes/superrtype/
 
 # Create a 2d game space ship shmup with pygame
+from lib2to3.pgen2.driver import Driver
+from turtle import back
 import pygame
 import random
 import math
@@ -31,6 +33,7 @@ GREEN = (0, 255, 0)
 ORANGE = (255, 165, 0)
 LIGHT_BLUE = (0, 255, 255)
 BROWN = (139, 69, 19)
+WHITE = (255, 255, 255)
 
 
 class Star:
@@ -87,6 +90,7 @@ class Ship:
         self.weapon_level = 1
         self.defense_level = 0
         self.name = ""
+        self.mask = pygame.mask.from_surface(self.sprite)
 
     def move(self):
         self.x += self.vx
@@ -131,6 +135,14 @@ class Ship:
         self.sprite = pygame.transform.flip(self.sprite, False, True)
         if(self.color_key is not None):
             self.sprite.set_colorkey(self.color_key)
+
+    def collide_mask(self, mask, x=0, y=0):
+        offset = (int(self.x - x), int(self.y - y))
+        poi = mask.overlap(self.mask, offset)
+        if(poi is not None):
+            return True
+        else:
+            return False
 
 # load a part of an image from a file to be used as a sprite frame
 
@@ -491,7 +503,22 @@ def projectile_hits_ship(projectile, ship):
     # solve the distance from the box to the projectile
     distance = math.sqrt(dx * dx + dy * dy)
 
-    return distance < projectile_r
+    # if it appears the projectile is inside the box perform a collision against the mask
+    if distance <= projectile_r:
+        # draw the bullet collision mask
+        surface = pygame.Surface(
+            (projectile.radius * 2, projectile.radius * 2))
+        pygame.draw.circle(
+            surface,
+            (0, 0, 0),
+            (projectile.radius, projectile.radius),
+            projectile.radius
+        )
+        projectile_mask = pygame.mask.from_surface(surface)
+        return ship.collide_mask(projectile_mask, projectile.x - projectile.radius, projectile.y - projectile.radius)
+
+    else:
+        return False
 
 
 def collide():
@@ -680,14 +707,19 @@ def draw_screen():
             "+ " + str(player.hp-player.max_hp), True, (100, 100, 255))
         screen.blit(text_shield_level, (text_score_line.get_width() + 10, 680))
 
-    text_boss_line = font.render(
-        boss.name + " HP: " + "{:0.0f}".format(boss.hp), True, (255, 100, 100))
-
     screen.blit(text_score_line, (0, 680))
-    screen.blit(text_boss_line, (width - text_boss_line.get_width(), 680))
+    draw_boss_text()
 
     # update the screen
     pygame.display.flip()
+
+
+def draw_boss_text():
+
+    text_boss_line = font.render(
+        boss.name + " HP: " + "{:0.0f}".format(boss.hp), True, (255, 100, 100))
+
+    screen.blit(text_boss_line, (width - text_boss_line.get_width(), 680))
 
 
 def run_title_screen():
@@ -708,9 +740,7 @@ def run_title_screen():
                 (width / 2 - text_title_start.get_width()/2,
                  height / 2 - text_title_start.get_height()/2))
 
-    screen.blit(text_title_heading,
-                (width / 2 - text_title_heading.get_width()/2,
-                 height / 2 - text_title_heading.get_height()/2 - 100))
+    draw_heading()
 
     # check for key press of space
     keys = pygame.key.get_pressed()
@@ -723,6 +753,12 @@ def run_title_screen():
 
     # update the screen
     pygame.display.flip()
+
+
+def draw_heading():
+    screen.blit(text_title_heading,
+                (width / 2 - text_title_heading.get_width()/2,
+                 50))
 
 
 def run_victory_screen():
@@ -814,14 +850,16 @@ def load_boss():
     elif sprite_selector == 3:
         boss.name = "Odin"
         boss.change_sprite("ships/ships_3.png", 1, 450,
-                           310, 140, (38, 37, 37), 1)
+                           310, 135, (38, 37, 37), 1)
         boss.flip_h()
 
     elif sprite_selector == 4:
         boss.name = "Alexander"
         boss.change_sprite("ships/ships_3.png", 1, 150,
-                           310, 140, (38, 37, 37), 1)
+                           310, 138, (38, 37, 37), 1)
         boss.flip_h()
+
+    boss.mask = pygame.mask.from_surface(boss.sprite)
 
     if boss_name_mark > 1:
         boss.name += " Mk " + get_roman_numeral(boss_name_mark)
@@ -856,7 +894,7 @@ def draw_starfield():
 
 
 def run_game_over_screen():
-    global game_state, player, boss, boss_projectiles
+    global game_state, player, boss, boss_projectiles, background_speed
 
     handle_game_events()
 
@@ -866,8 +904,11 @@ def run_game_over_screen():
     move_starfield()
     draw_starfield()
 
+    background_speed = constrain(background_speed * 0.99, 0.5, None)
+
     boss.vx = 1
     boss.vy = 0
+    boss.move()
     boss.draw()
 
     # draw the projectiles
@@ -886,9 +927,13 @@ def run_game_over_screen():
                 (width / 2 - text_quit_key.get_width()/2,
                     height / 2 - text_quit_key.get_height()/2 + 50))
 
+    draw_boss_text()
+    draw_heading()
+
     # check for enter key to start a new game
     keys = pygame.key.get_pressed()
     if keys[pygame.K_RETURN]:
+        background_speed = 1
         player.hp = player.max_hp
         boss.hp = boss.max_hp
         player.x = 100
