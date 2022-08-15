@@ -755,7 +755,7 @@ def run_victory_screen():
 def load_boss():
     global boss
 
-    sprite_selector = boss.level % 4
+    sprite_selector = boss.level % 5
 
     if sprite_selector == 0:
         boss.name = "Roy Carnassus"
@@ -780,7 +780,7 @@ def load_boss():
     elif sprite_selector == 4:
         boss.name = "Alexander"
         boss.change_sprite("ships/ships_3.png", 1, 150,
-                           310, 150, (38, 37, 37), 1)
+                           310, 140, (38, 37, 37), 1)
         boss.flip_h()
 
 
