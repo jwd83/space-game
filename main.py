@@ -22,6 +22,7 @@ FONT_SIZE_NORMAL = 48
 FONT_SIZE_SMALL = 36
 HEAL_CHANCE = 4
 SHOW_PROJECTILE_VALUES = False
+BOSS_BASE_HEALTH = 100
 
 # classes
 
@@ -286,12 +287,14 @@ def handle_boss_logic():
         boss.vx += random.randint(-2, 2)
         boss.vy += random.randint(-2, 2)
 
-        boss.vx = constrain(boss.vx, -5, 5)
-        boss.vy = constrain(boss.vy, -5, 5)
+        max_velocity = 5 + int(boss.level / 4)
+
+        boss.vx = constrain(boss.vx, -max_velocity, max_velocity)
+        boss.vy = constrain(boss.vy, -max_velocity, max_velocity)
 
     # control the bosses shooting
-    if(frame_counter % 13 - boss.level == 0):
-        if (random.randint(0, 100) < 50):
+    if(frame_counter % constrain((13 - boss.level), 8, 13) == 0):
+        if (random.randint(0, 100) < (50+int(boss.level/4))):
             boss_shoot()
 
 
@@ -830,13 +833,16 @@ def run_victory_screen():
 def load_boss():
     global boss
 
-    sprite_selector = boss.level % 5
-    boss_name_mark = constrain(math.floor((boss.level - 1) / 5) + 1, 0, None)
+    boss_divisor = 10  # 1 less than the last elif
+
+    sprite_selector = boss.level % boss_divisor
+    boss_name_mark = constrain(math.floor(
+        (boss.level - boss_divisor) / boss_divisor) + 1, 0, None)
 
     if sprite_selector == 0:
         boss.name = "Roy Carnassus"
-        boss.change_sprite("ships/ships_3.png", 1, 300,
-                           310, 140, (38, 37, 37), 1)
+        boss.change_sprite("ships/Zeromus2.gif", 0, 0,
+                           304, 256, None, 1)
         boss.flip_h()
     elif sprite_selector == 1:
         boss.name = "Morpha"
@@ -857,6 +863,33 @@ def load_boss():
         boss.name = "Alexander"
         boss.change_sprite("ships/ships_3.png", 1, 150,
                            310, 138, (38, 37, 37), 1)
+        boss.flip_h()
+
+    elif sprite_selector == 5:
+        boss.name = "Rathtar Overlord"
+        boss.change_sprite("ships/plantboy.gif", 0, 0,
+                           126, 94, None, 1)
+        boss.flip_h()
+
+    elif sprite_selector == 6:
+        boss.name = "Doom Train"
+        boss.change_sprite("ships/train.gif", 0, 0,
+                           240, 208, None, 1)
+
+    elif sprite_selector == 7:
+        boss.name = "The Great Cthulhu"
+        boss.change_sprite("ships/cthulhu.png", 0, 0,
+                           722, 608, None, 0.3)
+
+    elif sprite_selector == 8:
+        boss.name = "Flying Spaghetti Monster"
+        boss.change_sprite("ships/sgetti.png", 0, 0,
+                           1280, 1027, None, 0.25)
+
+    elif sprite_selector == 9:
+        boss.name = "Zone Eater"
+        boss.change_sprite("ships/zone-eater.gif", 0, 0,
+                           190, 144, None, 1)
         boss.flip_h()
 
     boss.mask = pygame.mask.from_surface(boss.sprite)
@@ -1042,7 +1075,10 @@ sound_boss_hit = pygame.mixer.Sound('sounds/boss_hit.wav')
 sound_player_heal = pygame.mixer.Sound('sounds/player_heal.wav')
 # sound_boss_death = pygame.mixer.Sound('sounds/boss_death.wav')
 sound_level_up = pygame.mixer.Sound('sounds/level_up.wav')
-
+print("Sounds loaded.")
+print("Increasing sound channels...")  # pygame defaults to 8, but we need more
+pygame.mixer.set_num_channels(32)
+print("Sound channels increased.")
 
 print("Initializing game clock...")
 clock = pygame.time.Clock()
@@ -1068,7 +1104,7 @@ player.x = 100
 # boss = Ship("ships/)
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
 boss.level = 1
-boss.max_hp = 100
+boss.max_hp = BOSS_BASE_HEALTH
 boss.hp = boss.max_hp
 load_boss()
 # boss.flip_h()
@@ -1078,7 +1114,7 @@ load_boss()
 boss.x = 1000
 boss.y = height/2
 
-
+# Begin main loop
 while not done:
 
     # check the game state and perform the appropriate actions
