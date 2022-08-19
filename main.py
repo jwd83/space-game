@@ -36,6 +36,29 @@ LIGHT_BLUE = (0, 255, 255)
 BROWN = (139, 69, 19)
 WHITE = (255, 255, 255)
 
+# enumerate the projectile types
+PROJECTILE_TYPE_CIRCLE = 1
+PROJECTILE_TYPE_MEATBALL = 2
+PROJECTILE_TYPE_NOODLE = 3
+PROJECTILE_TYPE_FOOTBALL = 4
+PROJECTILE_TYPE_BASEBALL = 5
+PROJECTILE_TYPE_BASKETBALL = 6
+PROJECTILE_TYPE_VOLLEYBALL = 7
+PROJECTILE_TYPE_SOCCER_BALL = 8
+PROJECTILE_TYPE_BOMB = 9
+PROJECTILE_TYPE_JAR = 10
+PROJECTILE_TYPE_MIRV = 11
+PROJECTILE_TYPE_TORPEDO = 12
+
+# enumerate the trash mob types
+MOB_TYPE_BOSS = -1
+MOB_TYPE_PLAYER = 0
+MOB_TYPE_BASIC = 1  # tie fighter sprite ?
+MOB_TYPE_GRAVITY = 2  # count down then start pulling objects into it
+MOB_TYPE_FIGHTER = 3  # x-wing sprite
+MOB_TYPE_HEALER = 4  # medivac srpite
+MOB_TYPE_SNARE = 5  # Snare drum sprite? :)
+
 
 class Star:
     def __init__(self):
@@ -75,7 +98,7 @@ class Star:
 
 
 class Ship:
-    def __init__(self, sprite, x, y, w, h, color_key=None, scale=1):
+    def __init__(self, sprite, x, y, w, h, color_key=None, scale=1, type=MOB_TYPE_BASIC):
         self.w = w
         self.h = h
         self.x = width/2
@@ -92,6 +115,7 @@ class Ship:
         self.defense_level = 0
         self.name = ""
         self.mask = pygame.mask.from_surface(self.sprite)
+        self.type = type
 
     def move(self):
         self.x += self.vx
@@ -149,7 +173,7 @@ class Ship:
 
 
 class Projectile:
-    def __init__(self, x, y, vx, vy, damage, color, radius, acceleration=1.0):
+    def __init__(self, x, y, vx, vy, damage, color, radius, acceleration=1.0, type=PROJECTILE_TYPE_CIRCLE):
         self.x = x
         self.y = y
         self.vx = vx
@@ -159,6 +183,7 @@ class Projectile:
         self.radius = radius
         self.acceleration = acceleration
         self.hit = False
+        self.type = type
 
     def move(self):
 
@@ -191,8 +216,29 @@ class Projectile:
                     screen, GREEN, (self.x, self.y), self.radius)
             else:
                 # otherwise, draw my circle normally
-                pygame.draw.circle(screen, self.color,
-                                   (self.x, self.y), self.radius)
+                if self.type == PROJECTILE_TYPE_CIRCLE:
+                    pygame.draw.circle(screen, self.color,
+                                       (self.x, self.y), self.radius)
+                    pygame.draw.circle(screen, (self.color[0]*0.5, self.color[1]*0.5, self.color[2]*0.5),
+                                       (self.x, self.y), self.radius,
+                                       width=4)
+
+                elif self.type == PROJECTILE_TYPE_MEATBALL:
+                    # screen.blit(meatball, (self.x - meatball.get_width() /
+                    #             2, self.y - meatball.get_height() / 2))
+                    self.blitRotateCenter(
+                        meatball,
+                        (self.x - meatball.get_width() / 2,
+                         self.y - meatball.get_height() / 2),
+                        frame_counter % 360
+                    )
+                elif self.type == PROJECTILE_TYPE_NOODLE:
+                    self.blitRotateCenter(
+                        noodle,
+                        (self.x - noodle.get_width() / 2,
+                         self.y - noodle.get_height() / 2),
+                        frame_counter % 360
+                    )
         else:
             if(self.damage < 0):
                 # if my damage is negative (healing), draw a green value
@@ -205,6 +251,14 @@ class Projectile:
                     str(self.damage), True, self.color)
             screen.blit(text_damage_value, (self.x, self.y))
 
+    def blitRotateCenter(self, image, topleft, angle):
+
+        rotated_image = pygame.transform.rotate(image, angle)
+        new_rect = rotated_image.get_rect(
+            center=image.get_rect(topleft=topleft).center)
+
+        screen.blit(rotated_image, new_rect)
+
 
 def load_image(filename, x, y, w, h, color_key=None, scale=1):
     image = pygame.image.load(filename)
@@ -216,6 +270,11 @@ def load_image(filename, x, y, w, h, color_key=None, scale=1):
 
 
 def move_starfield():
+    global galaxy1x
+    global galaxy1vx
+
+    galaxy1x -= galaxy1vx * background_speed
+
     for star in stars:
         star.move()
 
@@ -345,7 +404,7 @@ def player_shoot():
         )
 
 
-def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.0, can_heal=False):
+def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.0, can_heal=False, projectile_type=PROJECTILE_TYPE_CIRCLE):
     source_x_center = source.x + source.w * source.scale / 2
     source_y_center = source.y + source.h * source.scale / 2
 
@@ -405,12 +464,23 @@ def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.
         color,
         radius,
         accel,
-
+        projectile_type
     )
 
 
 def boss_shoot():
     # global boss_projectiles
+
+    # set default attack to circle
+    projectile_type = PROJECTILE_TYPE_CIRCLE
+
+    # if it's the flying spaghetti monster, set the attack type to a meatball
+    if boss.level == 8:
+        # 50/50 chance to shoot a meatball or a noodle
+        if random.randint(0, 100) < 50:
+            projectile_type = PROJECTILE_TYPE_MEATBALL
+        else:
+            projectile_type = PROJECTILE_TYPE_NOODLE
 
     # shoot a projectile from the boss straight ahead
     boss_projectiles.append(
@@ -422,7 +492,8 @@ def boss_shoot():
             YELLOW,
             15,
             10,
-            can_heal=True
+            can_heal=True,
+            projectile_type=projectile_type
         )
     )
 
@@ -436,7 +507,8 @@ def boss_shoot():
                 ORANGE,
                 10,
                 6,
-                can_heal=True
+                can_heal=True,
+                projectile_type=projectile_type
             )
         )
 
@@ -451,7 +523,8 @@ def boss_shoot():
                 RED,
                 10,
                 7,
-                can_heal=True
+                can_heal=True,
+                projectile_type=projectile_type
             )
         )
 
@@ -467,7 +540,8 @@ def boss_shoot():
                 10,
                 speed=5,
                 can_heal=True,
-                accel=1.05
+                accel=1.05,
+                projectile_type=projectile_type
             )
         )
 
@@ -508,17 +582,26 @@ def projectile_hits_ship(projectile, ship):
 
     # if it appears the projectile is inside the box perform a collision against the mask
     if distance <= projectile_r:
-        # draw the bullet collision mask
-        surface = pygame.Surface(
-            (projectile.radius * 2, projectile.radius * 2))
-        pygame.draw.circle(
-            surface,
-            (0, 0, 0),
-            (projectile.radius, projectile.radius),
-            projectile.radius
-        )
-        projectile_mask = pygame.mask.from_surface(surface)
-        return ship.collide_mask(projectile_mask, projectile.x - projectile.radius, projectile.y - projectile.radius)
+
+        if projectile.type == PROJECTILE_TYPE_CIRCLE or projectile.damage < 0:
+            # if the projectile is a circle, perform a circle collision
+            # against the mask of a circle. begin by drawing the bullet
+            # collision mask
+            surface = pygame.Surface(
+                (projectile.radius * 2, projectile.radius * 2))
+            pygame.draw.circle(
+                surface,
+                (0, 0, 0),
+                (projectile.radius, projectile.radius),
+                projectile.radius
+            )
+            projectile_mask = pygame.mask.from_surface(surface)
+            return ship.collide_mask(projectile_mask, projectile.x - projectile.radius, projectile.y - projectile.radius)
+        else:
+            # if the projectile is a sprite we will need to draw
+            # collide the sprite's mask against the ship's mask
+            # for now just return false
+            return False
 
     else:
         return False
@@ -734,10 +817,7 @@ def run_title_screen():
     screen.fill((0, 0, 0))
 
     move_starfield()
-
-    # draw the stars
-    for star in stars:
-        star.draw()
+    draw_starfield()
 
     screen.blit(text_title_start,
                 (width / 2 - text_title_start.get_width()/2,
@@ -855,8 +935,8 @@ def load_boss():
 
     elif sprite_selector == 3:
         boss.name = "Odin"
-        boss.change_sprite("ships/ships_3.png", 1, 450,
-                           310, 135, (38, 37, 37), 1)
+        boss.change_sprite("ships/atma.gif", 0, 0,
+                           256, 256, None, 1)
         boss.flip_h()
 
     elif sprite_selector == 4:
@@ -921,6 +1001,10 @@ def get_roman_numeral(number):
 
 
 def draw_starfield():
+
+    # draw the galaxy1 in the furthest back layer
+    screen.blit(galaxy1, (galaxy1x, 0))
+
     # draw the stars
     for star in stars:
         star.draw()
@@ -994,9 +1078,7 @@ def run_level_up_screen():
 
     move_starfield()
 
-    # draw the stars
-    for star in stars:
-        star.draw()
+    draw_starfield()
 
     screen.blit(text_level_up,
                 (width / 2 - text_level_up.get_width()/2,
@@ -1018,6 +1100,13 @@ def run_level_up_screen():
 
     # check for tab key to level up defense
     if keys[pygame.K_TAB]:
+        player.defense_level += 1
+        player.max_hp += 5
+        player.hp = player.max_hp
+
+    # check for the q key to boost both without the frame perfect double level up
+    if keys[pygame.K_q]:
+        player.weapon_level += 1
         player.defense_level += 1
         player.max_hp += 5
         player.hp = player.max_hp
@@ -1096,6 +1185,7 @@ for i in range(300):
 # player = Ship("ships/73180.png", 3, 0, 28, 32, (163, 73, 164), 3)
 # player.flip_h()
 player = Ship("ships/ships_3.png", 1, 585, 310, 150, (38, 37, 37), 0.25)
+player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
 player.hp = player.max_hp
 player.x = 100
@@ -1103,12 +1193,23 @@ player.x = 100
 
 # boss = Ship("ships/)
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
+boss.type = MOB_TYPE_BOSS
 boss.level = 1
 boss.max_hp = BOSS_BASE_HEALTH
 boss.hp = boss.max_hp
 load_boss()
 # boss.flip_h()
 # boss.name = "Spike"
+
+# galaxy1 = load_image("ships/galaxy1.png", 0, 0, 1624, 1370, None, 0.5)
+# https://www.pngmart.com/image/37328/png/37327
+galaxy1 = load_image("ships/galaxy2.png", 0, 0, 800, 424, None, 0.25)
+galaxy1x = width - galaxy1.get_width()
+galaxy1vx = 1/30
+
+meatball = load_image("ships/meatball.png", 0, 0, 486, 521, None, 0.08)
+noodle = load_image("ships/macaroni.png", 0, 0, 1293, 1010, None, 0.03)
+
 
 # boss.flip_h()
 boss.x = 1000

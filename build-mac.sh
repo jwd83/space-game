@@ -11,5 +11,8 @@ cp -rfv ships dist/
 # copy in the sounds folder to the dist folder
 cp -rfv sounds dist/
 
+# copy in the music folder to the dist folder
+cp -rfv music dist/
+
 
 zip -r macos.zip dist
