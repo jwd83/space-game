@@ -375,7 +375,6 @@ def player_shoot():
 
     # player level 2 weapon: quadrant attack
     if player.weapon_level >= 2:
-        # perform basic attack
         player_projectiles.append(
             fire_projectile(
                 player,
@@ -390,7 +389,6 @@ def player_shoot():
 
     # player level 3 weapon: targeted attack
     if player.weapon_level >= 3:
-        # perform basic attack
         player_projectiles.append(
             fire_projectile(
                 player,
@@ -403,8 +401,52 @@ def player_shoot():
             )
         )
 
+    # player level 4 weapon: second forward attack
+    if player.weapon_level >= 4:
+        player_projectiles.append(
+            fire_projectile(
+                player,
+                boss,
+                1,
+                player.weapon_level,
+                (100, 100, 255),
+                6,
+                20,
+                ox=-5,
+                oy=-15
+            )
+        )
+    # player level 5 weapon: third forward attack
+    if player.weapon_level >= 5:
+        player_projectiles.append(
+            fire_projectile(
+                player,
+                boss,
+                1,
+                player.weapon_level,
+                (100, 100, 255),
+                6,
+                20,
+                ox=-5,
+                oy=15
+            )
+        )
 
-def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.0, can_heal=False, projectile_type=PROJECTILE_TYPE_CIRCLE):
+
+def fire_projectile(
+    source,
+    target,
+    mode,
+    damage,
+    color,
+    radius,
+    speed,
+    accel=1.0,
+    can_heal=False,
+    projectile_type=PROJECTILE_TYPE_CIRCLE,
+    ox=0,
+    oy=0
+):
     source_x_center = source.x + source.w * source.scale / 2
     source_y_center = source.y + source.h * source.scale / 2
 
@@ -456,15 +498,15 @@ def fire_projectile(source, target, mode, damage, color, radius, speed, accel=1.
 
     # return the custom projectile
     return Projectile(
-        source_x_center,
-        source_y_center,
+        source_x_center + ox,
+        source_y_center + oy,
         vx,
         vy,
         damage,
         color,
         radius,
         accel,
-        projectile_type
+        projectile_type,
     )
 
 
