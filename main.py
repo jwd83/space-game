@@ -24,6 +24,7 @@ HEAL_CHANCE = 4
 SHOW_PROJECTILE_VALUES = False
 BOSS_BASE_HEALTH = 100
 
+
 # classes
 
 YELLOW = (255, 255, 0)
@@ -32,9 +33,12 @@ BLUE = (0, 0, 255)
 PURPLE = (255, 0, 255)
 GREEN = (0, 255, 0)
 ORANGE = (255, 165, 0)
-LIGHT_BLUE = (0, 255, 255)
+CYAN = (0, 255, 255)
 BROWN = (139, 69, 19)
 WHITE = (255, 255, 255)
+WHITE_2 = (238, 238, 238)
+WHITE_3 = (210, 210, 210)
+
 
 # enumerate the projectile types
 PROJECTILE_TYPE_CIRCLE = 1
@@ -58,6 +62,10 @@ MOB_TYPE_GRAVITY = 2  # count down then start pulling objects into it
 MOB_TYPE_FIGHTER = 3  # x-wing sprite
 MOB_TYPE_HEALER = 4  # medivac srpite
 MOB_TYPE_SNARE = 5  # Snare drum sprite? :)
+
+
+def boss_start_position():
+    return width - boss.w * boss.scale - 100
 
 
 class Star:
@@ -84,8 +92,9 @@ class Star:
     def move(self):
         self.x -= self.speed * background_speed
 
-        if(self.x < 0 - self.speed):
-            self.x = width + self.speed
+        if(self.x < 0 - ((self.size + self.speed) * background_speed)):
+            self.x = width + self.speed + \
+                random.randrange(0, int(self.size + self.speed))
             self.y = random.randint(0, height)
 
     def draw(self):
@@ -95,6 +104,27 @@ class Star:
             (self.x, self.y),
             self.size
         )
+
+        # draw a a line from the center of the towards the right edge of the screen
+        if background_speed > 1.0:
+            # pygame.draw.line(
+            #     screen,
+            #     (self.r, self.g, self.b),
+            #     (self.x, self.y),
+            #     (self.x+background_speed*2*self.speed, self.y),
+            #     1
+            # )
+
+            # draw a triangle pointing to the right
+            pygame.draw.polygon(
+                screen,
+                (self.r, self.g, self.b),
+                (
+                    (self.x, self.y+self.size),
+                    (self.x + background_speed * 2 * self.speed, self.y),
+                    (self.x, self.y-self.size)
+                )
+            )
 
 
 class Ship:
@@ -195,14 +225,15 @@ class Projectile:
                 self.vy = 0
                 return True
 
-        if frame_counter % 2 == 0:
-            self.vx *= self.acceleration
-            self.vy *= self.acceleration
+        if self.acceleration != 1.0:
+            if frame_counter % 2 == 0:
+                self.vx *= self.acceleration
+                self.vy *= self.acceleration
 
         self.x += self.vx
         self.y += self.vy
 
-        if(self.x < 0 or self.x > width or self.y < 0 or self.y > height):
+        if(self.x < (0 - self.radius) or self.x > (width + self.radius) or self.y < (0 - self.radius) or self.y > (height + self.radius)):
             return True
         else:
             return False
@@ -219,9 +250,9 @@ class Projectile:
                 if self.type == PROJECTILE_TYPE_CIRCLE:
                     pygame.draw.circle(screen, self.color,
                                        (self.x, self.y), self.radius)
-                    pygame.draw.circle(screen, (self.color[0]*0.5, self.color[1]*0.5, self.color[2]*0.5),
-                                       (self.x, self.y), self.radius,
-                                       width=4)
+                    # pygame.draw.circle(screen, (self.color[0]*0.5, self.color[1]*0.5, self.color[2]*0.5),
+                    #                    (self.x, self.y), self.radius,
+                    #                    width=4)
 
                 elif self.type == PROJECTILE_TYPE_MEATBALL:
                     # screen.blit(meatball, (self.x - meatball.get_width() /
@@ -366,8 +397,8 @@ def player_shoot():
             player,
             boss,
             1,
-            1+(player.weapon_level*2),
-            (100, 100, 255),
+            player.weapon_level*3,
+            WHITE,
             6,
             20
         )
@@ -380,8 +411,8 @@ def player_shoot():
                 player,
                 boss,
                 2,
-                player.weapon_level,
-                (25, 150, 255),
+                player.weapon_level*2,
+                CYAN,
                 6,
                 20
             )
@@ -394,8 +425,8 @@ def player_shoot():
                 player,
                 boss,
                 3,
-                player.weapon_level-1,
-                (255, 255, 255),
+                player.weapon_level,
+                BLUE,
                 6,
                 20
             )
@@ -408,14 +439,15 @@ def player_shoot():
                 player,
                 boss,
                 1,
-                player.weapon_level,
-                (100, 100, 255),
+                player.weapon_level*2,
+                WHITE_2,
                 6,
                 20,
                 ox=-5,
                 oy=-15
             )
         )
+
     # player level 5 weapon: third forward attack
     if player.weapon_level >= 5:
         player_projectiles.append(
@@ -423,8 +455,40 @@ def player_shoot():
                 player,
                 boss,
                 1,
+                player.weapon_level*2,
+                WHITE_2,
+                6,
+                20,
+                ox=-5,
+                oy=15
+            )
+        )
+
+    # player level 6 weapon: second quadrant attack
+    if player.weapon_level >= 6:
+        player_projectiles.append(
+            fire_projectile(
+                player,
+                boss,
+                2,
                 player.weapon_level,
-                (100, 100, 255),
+                CYAN,
+                6,
+                20,
+                ox=-5,
+                oy=-15
+            )
+        )
+
+    # player level 7 weapon: third quadrant attack
+    if player.weapon_level >= 7:
+        player_projectiles.append(
+            fire_projectile(
+                player,
+                boss,
+                2,
+                player.weapon_level,
+                CYAN,
                 6,
                 20,
                 ox=-5,
@@ -1097,7 +1161,7 @@ def run_game_over_screen():
         boss.hp = boss.max_hp
         player.x = 100
         player.y = height / 2 - player.h * player.scale / 2
-        boss.x = width - boss.w * boss.scale - 100
+        boss.x = boss_start_position()
         boss.y = height / 2 - boss.h * boss.scale / 2
         boss_projectiles = []
         game_state = "game"
@@ -1155,16 +1219,44 @@ def run_level_up_screen():
 
     # check for a key press of either enter or tab to start the next level
     if keys[pygame.K_RETURN] or keys[pygame.K_TAB]:
-        background_speed = 1
-        player.x = 100
+
+        player.x = width * 1.5
         player.y = height / 2 - player.h * player.scale / 2
-        boss.x = width - boss.w * boss.scale - 100
+
+        boss.x = width * 2
         boss.y = height / 2 - boss.h * boss.scale / 2
-        game_state = "game"
+        boss.vx = 0
+        boss.vy = 0
+
+        game_state = "start_level"
 
     # check for a key press of escape
     if keys[pygame.K_ESCAPE]:
         game_state = "quit"
+
+    # update the screen
+    pygame.display.flip()
+
+
+def run_start_level_screen():
+    global game_state, player, boss, background_speed
+
+    handle_game_events()
+
+    background_speed = constrain(background_speed * 0.97, 1.0, None)
+    player.x = constrain(player.x - (10 + 5 * background_speed), 100, None)
+    boss.x = constrain(boss.x - (10 + 4 * background_speed),
+                       boss_start_position(), None)
+    move_starfield()
+
+    # draw a starry background
+    screen.fill((0, 0, 0))
+    draw_starfield()
+    player.draw()
+    boss.draw()
+
+    if background_speed == 1.0 and player.x == 100:
+        game_state = "game"
 
     # update the screen
     pygame.display.flip()
@@ -1254,7 +1346,7 @@ noodle = load_image("ships/macaroni.png", 0, 0, 1293, 1010, None, 0.03)
 
 
 # boss.flip_h()
-boss.x = 1000
+boss.x = boss_start_position()
 boss.y = height/2
 
 # Begin main loop
@@ -1277,6 +1369,9 @@ while not done:
     elif game_state == "game_over":
         run_game_over_screen()
 
+    elif game_state == "start_level":
+        run_start_level_screen()
+
     elif game_state == "quit":
         done = True
 
@@ -1289,7 +1384,7 @@ while not done:
         state_start_frame = frame_counter
 
     # console the frame rate
-    if(frame_counter % 100 == 0):
+    if(frame_counter % 60 == 0):
         print("Frame rate: " + str(round(clock.get_fps())) +
               ", Game State: " + game_state)
 
