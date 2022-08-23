@@ -3,8 +3,8 @@
 # sprite resources: https://www.spriters-resource.com/snes/superrtype/
 
 # Create a 2d game space ship shmup with pygame
-from lib2to3.pgen2.driver import Driver
-from turtle import back
+# from lib2to3.pgen2.driver import Driver
+# from turtle import back
 import pygame
 import random
 import math
@@ -776,10 +776,21 @@ def update_game():
 
     # move the boss and bounce off edges
     if boss.move():
+        y_bounce = False
+        x_bounce = False
+
         if boss.y == 0 or boss.y == height - boss.h * boss.scale:
             boss.vy *= -1
+            y_bounce = True
         if boss.x == 0 or boss.x == width - boss.w * boss.scale:
             boss.vx *= -1
+            x_bounce = True
+
+        # if the boss perfectly hits a corner kill the player
+        if x_bounce and y_bounce:
+            player.hp = 0
+            print("PERFECT CORNER HIT! PAM BEESLEY CHEERS ON " +
+                  boss.name + " AS IT DESTROYS YOU")
 
     # move the projectiles
     move_projectiles()
@@ -833,6 +844,8 @@ def draw_screen():
 
     # draw the boss
     boss.draw()
+
+    # for
 
     # draw the projectiles
     draw_projectiles()
@@ -1042,10 +1055,13 @@ def run_victory_screen():
 
 
 def load_boss():
-    global boss
+    global boss, enemy_units
 
+    # clear enemy units
+    enemy_units = []
+
+    # select the boss and name it
     boss_divisor = 10
-
     sprite_selector = boss.level % boss_divisor
 
     boss_name_mark = 0
@@ -1355,6 +1371,8 @@ done = False
 stars = []
 player_projectiles = []
 boss_projectiles = []
+enemy_units = []
+
 
 print("Seeding starfield...")
 for i in range(starfield_size):
