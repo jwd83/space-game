@@ -954,6 +954,10 @@ def run_title_screen():
     # check for key press of space
     keys = pygame.key.get_pressed()
     if keys[pygame.K_SPACE]:
+        # start music
+        pygame.mixer.music.load('sounds/music-1-flashman.ogg')
+        pygame.mixer.music.play()
+
         game_state = "start_level"
 
     # check for a key press of escape

@@ -7,6 +7,7 @@ PyInstaller --onefile main.py
 cp -r ships ./dist/
 cp -r sounds ./dist/
 cp -r music ./dist/
+cp -r sprites ./dist/
 
 rm -force windows.zip
 
