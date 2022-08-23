@@ -18,6 +18,10 @@ frame_last_shot = 0
 game_state = "title"
 last_game_state = "title"
 state_start_frame = 0
+starfield_size = 300
+
+BACKGROUND_SPEED_NORMAL = 1.0
+BACKGROUND_SPEED_WARP = 10
 FONT_SIZE_NORMAL = 48
 FONT_SIZE_SMALL = 36
 HEAL_CHANCE = 4
@@ -106,7 +110,7 @@ class Star:
         )
 
         # draw a a line from the center of the towards the right edge of the screen
-        if background_speed > 1.0:
+        if background_speed > 1.5:
             # pygame.draw.line(
             #     screen,
             #     (self.r, self.g, self.b),
@@ -120,7 +124,7 @@ class Star:
                 screen,
                 (self.r, self.g, self.b),
                 (
-                    (self.x, self.y+self.size),
+                    (self.x, self.y+self.size+1),
                     (self.x + background_speed * 2 * self.speed, self.y),
                     (self.x, self.y-self.size)
                 )
@@ -291,8 +295,18 @@ class Projectile:
         screen.blit(rotated_image, new_rect)
 
 
-def load_image(filename, x, y, w, h, color_key=None, scale=1):
+def load_image(filename, x: int | None = None, y: int | None = None, w: int | None = None, h: int | None = None, color_key=None, scale=1):
     image = pygame.image.load(filename)
+
+    if x is None:
+        x = 0
+    if y is None:
+        y = 0
+    if w is None:
+        w = image.get_width()
+    if h is None:
+        h = image.get_height()
+
     image = image.subsurface(x, y, w, h)
     image = pygame.transform.scale(image, (int(w * scale), int(h * scale)))
     if(color_key is not None):
@@ -762,8 +776,10 @@ def update_game():
 
     # move the boss and bounce off edges
     if boss.move():
-        boss.vx = -boss.vx
-        boss.vy = -boss.vy
+        if boss.y == 0 or boss.y == height - boss.h * boss.scale:
+            boss.vy *= -1
+        if boss.x == 0 or boss.x == width - boss.w * boss.scale:
+            boss.vx *= -1
 
     # move the projectiles
     move_projectiles()
@@ -794,10 +810,6 @@ def update_game():
         boss.max_hp *= 1.5
         boss.hp = boss.max_hp
         player.hp = constrain(player.hp + 10, 0, player.max_hp)
-
-    # background_speed *= 1.04
-    # if background_speed > 8:
-    #     background_speed = 8
 
 
 def draw_projectiles():
@@ -915,7 +927,10 @@ def draw_boss_text():
 
 
 def run_title_screen():
-    global game_state
+    global game_state, background_speed
+
+    background_speed = constrain(
+        background_speed * 1.01, 1, BACKGROUND_SPEED_WARP)
 
     handle_game_events()
 
@@ -925,16 +940,21 @@ def run_title_screen():
     move_starfield()
     draw_starfield()
 
+    player.x = width * 1.5
+    boss.x = width * 2
+
     screen.blit(text_title_start,
                 (width / 2 - text_title_start.get_width()/2,
                  height / 2 - text_title_start.get_height()/2))
+
+    screen.blit(controls, (width / 2 - controls.get_width() / 2, 400))
 
     draw_heading()
 
     # check for key press of space
     keys = pygame.key.get_pressed()
     if keys[pygame.K_SPACE]:
-        game_state = "game"
+        game_state = "start_level"
 
     # check for a key press of escape
     if keys[pygame.K_ESCAPE]:
@@ -976,7 +996,8 @@ def run_victory_screen():
         player.vy = 0
 
     if state_current_frame() > 150:
-        background_speed = constrain(background_speed * 0.99, 0.1, 8)
+        background_speed = constrain(
+            background_speed * 0.99, 0.1, BACKGROUND_SPEED_WARP)
         player_projectiles = []
         # draw a circle expanding out from behind the player
         pygame.draw.circle(
@@ -991,7 +1012,7 @@ def run_victory_screen():
 
     if state_current_frame() > 270:
         player.x = width * 3
-        background_speed = 7
+        background_speed = BACKGROUND_SPEED_WARP
         # draw a white box where the player left off from across the screen
         pygame.draw.rect(
             screen,
@@ -1019,11 +1040,15 @@ def run_victory_screen():
 def load_boss():
     global boss
 
-    boss_divisor = 10  # 1 less than the last elif
+    boss_divisor = 10
 
     sprite_selector = boss.level % boss_divisor
-    boss_name_mark = constrain(math.floor(
-        (boss.level - boss_divisor) / boss_divisor) + 1, 0, None)
+
+    boss_name_mark = 0
+    boss_level = boss.level
+    while boss_level > 0:
+        boss_level -= boss_divisor
+        boss_name_mark += 1
 
     if sprite_selector == 0:
         boss.name = "Roy Carnassus"
@@ -1255,7 +1280,20 @@ def run_start_level_screen():
     player.draw()
     boss.draw()
 
-    if background_speed == 1.0 and player.x == 100:
+    # draw the threat detected text
+    screen.blit(text_threat_detected,
+                (width / 2 - text_threat_detected.get_width()/2,
+                 100)
+                )
+
+    if state_current_frame() > 20:
+        # draw the bosses name text below the threat detected text
+        boss_name_text = font.render("It's " + boss.name, True, (255, 0, 0))
+
+        screen.blit(boss_name_text, (width / 2 -
+                    boss_name_text.get_width()/2, 150))
+
+    if background_speed == 1.0 and player.x == 100 and boss.x == boss_start_position():
         game_state = "game"
 
     # update the screen
@@ -1280,6 +1318,8 @@ font = pygame.font.SysFont(None, FONT_SIZE_NORMAL)
 font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
 text_title_heading = font.render(
     "The Hunt for Roy Carnassus", True, (255, 255, 255))
+text_threat_detected = font.render(
+    "THREAT DETECTED !!", True, (255, 0, 0))
 text_title_start = font.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_quit_key = font.render('[escape] TO QUIT', True, (255, 255, 255))
@@ -1313,12 +1353,13 @@ player_projectiles = []
 boss_projectiles = []
 
 print("Seeding starfield...")
-for i in range(300):
+for i in range(starfield_size):
     stars.append(Star())
 
 # player = Ship("ships/73180.png", 3, 0, 28, 32, (163, 73, 164), 3)
 # player.flip_h()
-player = Ship("ships/ships_3.png", 1, 585, 310, 150, (38, 37, 37), 0.25)
+# player = Ship("ships/ships_3.png", 1, 585, 310, 150, (38, 37, 37), 0.25)
+player = Ship("sprites/mjd-player.png", 0, 0, 58, 23, None, 1.4)
 player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
 player.hp = player.max_hp
@@ -1341,8 +1382,9 @@ galaxy1 = load_image("ships/galaxy2.png", 0, 0, 800, 424, None, 0.25)
 galaxy1x = width - galaxy1.get_width()
 galaxy1vx = 1/30
 
-meatball = load_image("ships/meatball.png", 0, 0, 486, 521, None, 0.08)
+meatball = load_image("sprites/jwd-meatball.png")
 noodle = load_image("ships/macaroni.png", 0, 0, 1293, 1010, None, 0.03)
+controls = load_image("sprites/jwd-move.png")
 
 
 # boss.flip_h()
