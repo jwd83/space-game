@@ -40,6 +40,8 @@ COMM_SOUNDS = [
     'sounds/comm-frog.ogg',
 ]
 
+trash_mobs = []
+
 # classes
 
 YELLOW = (255, 255, 0)
@@ -53,6 +55,7 @@ BROWN = (139, 69, 19)
 WHITE = (255, 255, 255)
 WHITE_2 = (238, 238, 238)
 WHITE_3 = (210, 210, 210)
+BLACK = (0, 0, 0)
 
 
 # enumerate the projectile types
@@ -72,11 +75,11 @@ PROJECTILE_TYPE_TORPEDO = 12
 # enumerate the trash mob types
 MOB_TYPE_BOSS = -1
 MOB_TYPE_PLAYER = 0
-MOB_TYPE_BASIC = 1  # tie fighter sprite ?
-MOB_TYPE_GRAVITY = 2  # count down then start pulling objects into it
-MOB_TYPE_FIGHTER = 3  # x-wing sprite
-MOB_TYPE_HEALER = 4  # medivac srpite
-MOB_TYPE_SNARE = 5  # Snare drum sprite? :)
+MOB_TYPE_BASIC = 1
+MOB_TYPE_HANGING = 2
+# MOB_TYPE_FIGHTER = 3
+# MOB_TYPE_HEALER = 4
+# MOB_TYPE_SNARE = 5
 
 
 def boss_start_position():
@@ -143,7 +146,7 @@ class Star:
 
 
 class Ship:
-    def __init__(self, sprite, x, y, w, h, color_key=None, scale=1, type=MOB_TYPE_BASIC):
+    def __init__(self, sprite, x=None, y=None, w=None, h=None, color_key=None, scale=1, type=MOB_TYPE_BASIC):
         self.w = w
         self.h = h
         self.x = width/2
@@ -161,26 +164,44 @@ class Ship:
         self.name = ""
         self.mask = pygame.mask.from_surface(self.sprite)
         self.type = type
+        self.base_y = None
+        self.sinusoid_speed = 200
 
-    def move(self):
+        if self.w == None:
+            self.w = self.sprite.get_width() / self.scale
+
+        if self.h == None:
+            self.h = self.sprite.get_height() / self.scale
+
+    def move(self, edge_bound=True):
         self.x += self.vx
-        self.y += self.vy
+
+        if self.type == MOB_TYPE_BOSS or self.type == MOB_TYPE_PLAYER:
+            self.y += self.vy
+
+        if self.type == MOB_TYPE_BASIC:
+            if self.base_y is None:
+                self.base_y = self.y
+
+            # move the y along a sinusoidal path
+            self.y = self.base_y + math.sin(self.x / 100) * self.sinusoid_speed
 
         edge_hit = False
 
-        if(self.x < 0):
-            self.x = 0
-            edge_hit = True
-        if(self.x + self.w * self.scale > width):
-            self.x = width - self.w * self.scale
-            edge_hit = True
+        if edge_bound:
+            if(self.x < 0):
+                self.x = 0
+                edge_hit = True
+            if(self.x + self.w * self.scale > width):
+                self.x = width - self.w * self.scale
+                edge_hit = True
 
-        if(self.y < 0):
-            self.y = 0
-            edge_hit = True
-        if(self.y + self.h * self.scale > height):
-            self.y = height - self.h * self.scale
-            edge_hit = True
+            if(self.y < 0):
+                self.y = 0
+                edge_hit = True
+            if(self.y + self.h * self.scale > height):
+                self.y = height - self.h * self.scale
+                edge_hit = True
 
         return edge_hit
 
@@ -412,6 +433,52 @@ def handle_boss_logic():
         if (random.randint(0, 100) < (50+int(boss.level/4))):
             boss_shoot()
 
+    if boss.level >= 2:
+        if state_current_frame() % (60 * 15) == 0:
+            # pick a random 1 or 2
+            boss_summon(random.randint(1, 2))
+
+
+def boss_summon(mob_type=1):
+    global trash_mobs
+
+    if mob_type == 1:
+
+        spacing = 0
+        mob_type = 'ships/trash1.gif'
+        base_y = random.randint(100, 500)
+
+        for i in range(0, 4):
+            new_mob = Ship(mob_type, scale=.5)
+            new_mob.max_hp = boss.level * 10
+            new_mob.hp = new_mob.max_hp
+            new_mob.x = width + new_mob.w * new_mob.scale + spacing
+            spacing += int(new_mob.w * new_mob.scale * 1.2)
+            new_mob.y = base_y
+            new_mob.vx = -3
+            new_mob.vy = 0
+            new_mob.flip_h()
+            trash_mobs.append(new_mob)
+
+    if mob_type == 2:
+
+        spacing = 0
+        mob_type = 'ships/trash2.gif'
+        base_y = -25
+
+        for i in range(0, 4):
+            new_mob = Ship(mob_type, scale=1.25)
+            new_mob.max_hp = boss.level * 20
+            new_mob.hp = new_mob.max_hp
+            new_mob.x = width + new_mob.w * new_mob.scale + spacing
+            spacing += int(new_mob.w * new_mob.scale * 1.4)
+            new_mob.y = base_y
+            new_mob.sinusoid_speed = 30
+            new_mob.vx = -3
+            new_mob.vy = 0
+            new_mob.flip_h()
+            trash_mobs.append(new_mob)
+
 
 def player_shoot():
     global player_projectiles
@@ -560,11 +627,11 @@ def fire_projectile(
             vx = random.random() * speed
 
         if source_y_center > target_y_center:
-            vy = random.random() * -speed
+            vy = abs(vx) - speed
         else:
-            vy = random.random() * speed
+            vy = speed - abs(vx)
 
-        while (abs(vx) + abs(vy) < speed / 1.5):
+        while (abs(vx) + abs(vy) < speed):
             vx *= 2
             vy *= 2
 
@@ -749,6 +816,15 @@ def collide():
                 boss.hp -= projectile.damage
                 # player_projectiles.remove(projectile)
                 projectile.hit = True
+            for trash_mob in trash_mobs:
+                if projectile_hits_ship(projectile, trash_mob):
+                    # play the player hit sound
+                    pygame.mixer.Sound.play(sound_player_hit)
+                    trash_mob.hp -= projectile.damage
+                    # player_projectiles.remove(projectile)
+                    projectile.hit = True
+                    if trash_mob.hp <= 0:
+                        trash_mobs.remove(trash_mob)
 
     # collide boss projectiles with the player
     for projectile in boss_projectiles:
@@ -774,7 +850,7 @@ def collide():
 
 
 def update_game():
-    global game_state, boss_projectiles, player_projectiles
+    global game_state, boss_projectiles, player_projectiles, trash_mobs
     # move the stars
     move_starfield()
 
@@ -803,6 +879,21 @@ def update_game():
             print("PERFECT CORNER HIT! PAM BEESLEY CHEERS ON " +
                   boss.name + " AS IT DESTROYS YOU")
 
+    for trash_mob in trash_mobs:
+        trash_mob.move(False)
+
+    # check for trash mobs that are off screen and remove them
+    for trash_mob in trash_mobs:
+        if trash_mob.x < -trash_mob.w * trash_mob.scale:
+            trash_mobs.remove(trash_mob)
+
+    if state_current_frame() % 60 == 0:
+        for trash_mob in trash_mobs:
+            boss_projectiles.append(
+                fire_projectile(trash_mob, player, 2, boss.level,
+                                ORANGE, 8, 8, can_heal=False, ox=-10, oy=20)
+            )
+
     # move the projectiles
     move_projectiles()
 
@@ -817,12 +908,13 @@ def update_game():
         game_state = "game_over"
         # boss_projectiles = []
         player_projectiles = []
+        trash_mobs = []
 
     # check for level up
     if boss.hp <= 0:
         # play the boss death sound
         pygame.mixer.Sound.play(sound_level_up)
-
+        trash_mobs = []
         game_state = "victory"
         # clear active projectiles from the board
         boss_projectiles = []
@@ -846,7 +938,7 @@ def draw_projectiles():
 
 def draw_screen():
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
     # draw the stars
     draw_starfield()
 
@@ -856,57 +948,17 @@ def draw_screen():
     # draw the boss
     boss.draw()
 
-    # for
+    # draw the trash mobs
+    for trash_mob in trash_mobs:
+        trash_mob.draw()
 
     # draw the projectiles
     draw_projectiles()
 
-    # draw the boss hp as a bar on the screen below the boss
-    pygame.draw.rect(
-        screen,
-        (255, 255, 0),
-        (
-            boss.x,
-            boss.y + boss.h * boss.scale,
-            boss.w * boss.scale,
-            10
-        )
-    )
-
-    pygame.draw.rect(
-        screen,
-        (255, 0, 0),
-        (
-            boss.x,
-            boss.y + boss.h * boss.scale,
-            (boss.w * boss.scale) * (boss.hp / boss.max_hp),
-            10
-        )
-    )
-
-    # draw the player hp bar on the screen below the player
-    pygame.draw.rect(
-        screen,
-        (255, 255, 0),
-        (
-            player.x,
-            player.y + player.h * player.scale,
-            player.w * player.scale,
-            10
-        )
-    )
-
-    pygame.draw.rect(
-        screen,
-        (0, 255, 0),
-        (
-            player.x,
-            player.y + player.h * player.scale,
-            (player.w * player.scale) *
-            (constrain(player.hp, 0, player.max_hp) / player.max_hp),
-            10
-        )
-    )
+    draw_hp_bar(RED, boss)
+    draw_hp_bar(GREEN, player)
+    for trash_mob in trash_mobs:
+        draw_hp_bar(BLUE, trash_mob)
 
     # draw the players shield level bar on the screen below the player
     if player.hp > player.max_hp:
@@ -942,6 +994,31 @@ def draw_screen():
     pygame.display.flip()
 
 
+def draw_hp_bar(color, ship):
+    pygame.draw.rect(
+        screen,
+        (255, 255, 0),
+        (
+            ship.x,
+            ship.y + ship.h * ship.scale,
+            ship.w * ship.scale,
+            10
+        )
+    )
+
+    pygame.draw.rect(
+        screen,
+        color,
+        (
+            ship.x,
+            ship.y + ship.h * ship.scale,
+            (ship.w * ship.scale) *
+            (constrain(ship.hp, 0, ship.max_hp) / ship.max_hp),
+            10
+        )
+    )
+
+
 def draw_boss_text():
 
     text_boss_line = font.render(
@@ -959,7 +1036,7 @@ def run_title_screen():
     handle_game_events()
 
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
 
     move_starfield()
     draw_starfield()
@@ -1005,7 +1082,7 @@ def run_victory_screen():
     handle_game_events()
 
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
 
     move_starfield()
     move_projectiles()
@@ -1018,11 +1095,11 @@ def run_victory_screen():
 
     # animate the player charging engines and zooming off
     if state_current_frame() == 0:
-        player.vx = (125 - player.x) / 150
+        player.vx = (400 - player.x) / 150
         player.vy = (height / 2 - player.y) / 150
 
     if state_current_frame() == 150:
-        player.vx = -1
+        player.vx = -3
         player.vy = 0
 
     if state_current_frame() > 150:
@@ -1167,7 +1244,7 @@ def get_roman_numeral(number):
 def draw_starfield():
 
     # draw the galaxy1 in the furthest back layer
-    screen.blit(galaxy1, (galaxy1x, 0))
+    screen.blit(galaxy1, (galaxy1x, galaxy1y))
 
     # draw the stars
     for star in stars:
@@ -1180,7 +1257,7 @@ def run_game_over_screen():
     handle_game_events()
 
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
 
     move_starfield()
     draw_starfield()
@@ -1238,7 +1315,7 @@ def run_level_up_screen():
     handle_game_events()
 
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
 
     move_starfield()
 
@@ -1308,16 +1385,16 @@ def run_start_level_screen():
     move_starfield()
 
     # draw a starry background
-    screen.fill((0, 0, 0))
+    screen.fill(BLACK)
     draw_starfield()
     player.draw()
     boss.draw()
 
     # draw the threat detected text
-    screen.blit(text_threat_detected,
-                (width / 2 - text_threat_detected.get_width()/2,
-                 100)
-                )
+    screen.blit(
+        text_threat_detected,
+        (width / 2 - text_threat_detected.get_width() / 2, 100)
+    )
 
     if state_current_frame() == 0:
         boss_warning = boss.level % 4 + 1
@@ -1408,9 +1485,6 @@ print("Seeding starfield...")
 for i in range(starfield_size):
     stars.append(Star())
 
-# player = Ship("ships/73180.png", 3, 0, 28, 32, (163, 73, 164), 3)
-# player.flip_h()
-# player = Ship("ships/ships_3.png", 1, 585, 310, 150, (38, 37, 37), 0.25)
 player = Ship("sprites/mjd-player.png", 0, 0, 58, 23, None, 1.4)
 player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
@@ -1418,20 +1492,17 @@ player.hp = player.max_hp
 player.x = 100
 
 
-# boss = Ship("ships/)
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
 boss.type = MOB_TYPE_BOSS
 boss.level = 1
 boss.max_hp = BOSS_BASE_HEALTH
 boss.hp = boss.max_hp
 load_boss()
-# boss.flip_h()
-# boss.name = "Spike"
 
-# galaxy1 = load_image("ships/galaxy1.png", 0, 0, 1624, 1370, None, 0.5)
-# https://www.pngmart.com/image/37328/png/37327
+
 galaxy1 = load_image("ships/galaxy2.png", 0, 0, 800, 424, None, 0.25)
-galaxy1x = width - galaxy1.get_width()
+galaxy1x = width + 150
+galaxy1y = random.randint(1, int(height - galaxy1.get_height()))
 galaxy1vx = 1/30
 
 meatball = load_image("sprites/jwd-meatball.png")
