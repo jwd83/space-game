@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 
 # sprite resources: https://www.spriters-resource.com/snes/superrtype/
+# pixelator : http://pixelatorapp.com/
+# sound resources : https://www.sounds-resource.com/
 
-# Create a 2d game space ship shmup with pygame
-# from lib2to3.pgen2.driver import Driver
-# from turtle import back
 import pygame
 import random
 import math
@@ -28,6 +27,18 @@ HEAL_CHANCE = 4
 SHOW_PROJECTILE_VALUES = False
 BOSS_BASE_HEALTH = 100
 
+# jukebox
+JUKEBOX = [
+    'sounds/music-1-flashman.ogg',
+    'sounds/music-2-topgear.ogg',
+]
+
+COMM_SOUNDS = [
+    'sounds/comm-bird.ogg',
+    'sounds/comm-bunny.ogg',
+    'sounds/comm-fox.ogg',
+    'sounds/comm-frog.ogg',
+]
 
 # classes
 
@@ -968,7 +979,9 @@ def run_title_screen():
     keys = pygame.key.get_pressed()
     if keys[pygame.K_SPACE]:
         # start music
-        pygame.mixer.music.load('sounds/music-1-flashman.ogg')
+        # select a random song from the JUKEBOX list
+
+        pygame.mixer.music.load(random.choice(JUKEBOX))
         pygame.mixer.music.play()
 
         game_state = "start_level"
@@ -1306,6 +1319,17 @@ def run_start_level_screen():
                  100)
                 )
 
+    if state_current_frame() == 0:
+        boss_warning = boss.level % 4 + 1
+        if boss_warning == 1:
+            pygame.mixer.Sound.play(sound_comm_bird)
+        elif boss_warning == 2:
+            pygame.mixer.Sound.play(sound_comm_fox)
+        elif boss_warning == 3:
+            pygame.mixer.Sound.play(sound_comm_bunny)
+        elif boss_warning == 4:
+            pygame.mixer.Sound.play(sound_comm_bunny)
+
     if state_current_frame() > 20:
         # draw the bosses name text below the threat detected text
         boss_name_text = font.render("It's " + boss.name, True, (255, 0, 0))
@@ -1330,7 +1354,7 @@ pygame.init()
 print("pygame.init() complete. Setting up screen...")
 screen = pygame.display.set_mode((width, height+60))
 pygame.display.set_caption(
-    "Magnetek Engineering Society: Operation Fractured Sky")
+    "The Hunt for Roy Carnassus")
 print("Screen setup complete.")
 
 print("Generating font objects...")
@@ -1356,6 +1380,12 @@ sound_player_hit = pygame.mixer.Sound('sounds/player_hit.wav')
 sound_player_death = pygame.mixer.Sound('sounds/player_death.wav')
 sound_boss_hit = pygame.mixer.Sound('sounds/boss_hit.wav')
 sound_player_heal = pygame.mixer.Sound('sounds/player_heal.wav')
+sound_comm_bird = pygame.mixer.Sound('sounds/comm-bird.ogg')
+sound_comm_bunny = pygame.mixer.Sound('sounds/comm-bunny.ogg')
+sound_comm_fox = pygame.mixer.Sound('sounds/comm-fox.ogg')
+sound_comm_frog = pygame.mixer.Sound('sounds/comm-frog.ogg')
+
+
 # sound_boss_death = pygame.mixer.Sound('sounds/boss_death.wav')
 sound_level_up = pygame.mixer.Sound('sounds/level_up.wav')
 print("Sounds loaded.")
