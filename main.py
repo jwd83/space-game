@@ -14,6 +14,7 @@ ship_speed = 9
 background_speed = 1.0
 frame_counter = 0
 frame_last_shot = 0
+frame_last_dodge = 0
 game_state = "title"
 last_game_state = "title"
 state_start_frame = 0
@@ -371,7 +372,7 @@ def move_projectiles():
 
 
 def handle_game_inputs():
-    global player, frame_last_shot
+    global player, frame_last_shot, frame_last_dodge
 
     # reset ship motion
     player.vx = 0
@@ -387,6 +388,13 @@ def handle_game_inputs():
         player.vy -= ship_speed
     if keys[pygame.K_DOWN] or keys[pygame.K_s]:
         player.vy += ship_speed
+    if keys[pygame.K_TAB]:
+        if frame_counter - frame_last_dodge > 60 * 5:
+            frame_last_dodge = frame_counter
+            if player.vx == 0 and player.vy == 0:
+                player.vx += ship_speed
+            player.vx *= 25
+            player.vy *= 25
     if keys[pygame.K_SPACE]:
         if(frame_counter - frame_last_shot > 5):
             player_shoot()
@@ -875,9 +883,10 @@ def update_game():
 
         # if the boss perfectly hits a corner kill the player
         if x_bounce and y_bounce:
-            player.hp = 0
-            print("PERFECT CORNER HIT! PAM BEESLEY CHEERS ON " +
-                  boss.name + " AS IT DESTROYS YOU")
+            if 'DVD' in boss.name:
+                player.hp = 0
+                print("PERFECT CORNER HIT! CHEERS ERUPT FROM SCRANTON, PA FOR " +
+                      boss.name + " AS IT DESTROYS YOU")
 
     for trash_mob in trash_mobs:
         trash_mob.move(False)
