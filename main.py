@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# project page: https://github.com/jwd83/space-game/
+
 # sprite resources: https://www.spriters-resource.com/snes/superrtype/
 # pixelator : http://pixelatorapp.com/
 # sound resources : https://www.sounds-resource.com/
