@@ -7,6 +7,7 @@
 import pygame
 import random
 import math
+import numpy as np
 
 width = 1280
 height = 660
@@ -19,6 +20,7 @@ game_state = "title"
 last_game_state = "title"
 state_start_frame = 0
 starfield_size = 300
+
 
 BACKGROUND_SPEED_NORMAL = 1.0
 BACKGROUND_SPEED_WARP = 10
@@ -146,6 +148,27 @@ class Star:
             )
 
 
+def reddening(surf):
+    """surf: pygame.Surface to be reddened. The function returns a new surface."""
+    # making a red shade with transparency
+    redshade = pygame.Surface(surf.get_rect().size).convert_alpha()
+    redshade.fill((255, 0, 0, 100))  # red with alpha
+
+    # merging the alpha chanel of base image on the redshade, keeping minimum values (most transparent) in each pixel
+    alpha_basemask = pygame.surfarray.array_alpha(surf)
+    alpha_redmask = pygame.surfarray.pixels_alpha(redshade)
+    np.minimum(alpha_basemask, alpha_redmask, out=alpha_redmask)
+
+    # deleting the alpha_redmask reference to unlock redshade (or it cannot be blit)
+    del alpha_redmask
+
+    # reddening a copy of the original image
+    redsurf = surf.copy()
+    redsurf.blit(redshade, (0, 0))
+
+    return redsurf
+
+
 class Ship:
     def __init__(self, sprite, x=None, y=None, w=None, h=None, color_key=None, scale=1, type=MOB_TYPE_BASIC):
         self.w = w
@@ -167,6 +190,12 @@ class Ship:
         self.type = type
         self.base_y = None
         self.sinusoid_speed = 200
+        self.frame_last_hit = 0
+
+        # create the alpha transparency mask for the ship
+        self.sprite_damaged = reddening(self.sprite)
+        if(self.color_key is not None):
+            self.sprite_damaged.set_colorkey(self.color_key)
 
         if self.w == None:
             self.w = self.sprite.get_width() / self.scale
@@ -212,21 +241,35 @@ class Ship:
         self.scale = scale
         self.color_key = color_key
         self.sprite = load_image(sprite, x, y, w, h, color_key, scale)
+        self.sprite_damaged = reddening(self.sprite)
+
         if(self.color_key is not None):
             self.sprite.set_colorkey(self.color_key)
+            self.sprite_damaged.set_colorkey(self.color_key)
+
+        # create the alpha transparency mask for the ship
 
     def draw(self):
-        screen.blit(self.sprite, (self.x, self.y))
+        if frame_counter - self.frame_last_hit <= 1:
+            screen.blit(self.sprite_damaged, (self.x, self.y))
+        else:
+            screen.blit(self.sprite, (self.x, self.y))
 
     def flip_h(self):
         self.sprite = pygame.transform.flip(self.sprite, True, False)
+        self.sprite_damaged = pygame.transform.flip(
+            self.sprite_damaged, True, False)
         if(self.color_key is not None):
             self.sprite.set_colorkey(self.color_key)
+            self.sprite_damaged.set_colorkey(self.color_key)
 
     def flip_v(self):
         self.sprite = pygame.transform.flip(self.sprite, False, True)
+        self.sprite_damaged = pygame.transform.flip(
+            self.sprite_damaged, False, True)
         if(self.color_key is not None):
             self.sprite.set_colorkey(self.color_key)
+            self.sprite_damaged.set_colorkey(self.color_key)
 
     def collide_mask(self, mask, x=0, y=0):
         offset = (int(self.x - x), int(self.y - y))
@@ -317,7 +360,9 @@ class Projectile:
                 # otherwise, draw my damage value normally
                 text_damage_value = font_small.render(
                     str(self.damage), True, self.color)
-            screen.blit(text_damage_value, (self.x, self.y))
+
+            screen.blit(text_damage_value, (self.x - text_damage_value.get_width() /
+                        2, self.y - text_damage_value.get_height()/2))
 
     def blitRotateCenter(self, image, topleft, angle):
 
@@ -329,7 +374,7 @@ class Projectile:
 
 
 def load_image(filename, x: int | None = None, y: int | None = None, w: int | None = None, h: int | None = None, color_key=None, scale=1):
-    image = pygame.image.load(filename)
+    image = pygame.image.load(filename).convert_alpha()
 
     if x is None:
         x = 0
@@ -378,24 +423,61 @@ def handle_game_inputs():
     player.vx = 0
     player.vy = 0
 
+    # xbox 360 controller map
+    # A button - 0   (dodge)
+    # B button - 1
+    # X button - 2   (shoot)
+    # Y button - 3
+    # LB button - 4
+    # RB button - 5
+    # Back button - 6
+    # Start button - 7
+    # Left stick (clicked in) - 8
+    # Right stick (clicked in) - 9
+    # guide button - 10
+
     # handle key presses
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+
+    joy_shoot = False
+    joy_dodge = False
+    joy_up = False
+    joy_down = False
+    joy_left = False
+    joy_right = False
+
+    # check for joystick input
+    if joystick is not None:
+        if joystick.get_button(0):
+            joy_dodge = True
+        if joystick.get_button(2):
+            joy_shoot = True
+        dpad_x, dpad_y = joystick.get_hat(0)  # no idea if this is right
+        if dpad_x == -1:
+            joy_left = True
+        elif dpad_x == 1:
+            joy_right = True
+        if dpad_y == -1:
+            joy_down = True
+        elif dpad_y == 1:
+            joy_up = True
+
+    if keys[pygame.K_LEFT] or keys[pygame.K_a] or joy_left:
         player.vx -= ship_speed
-    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+    if keys[pygame.K_RIGHT] or keys[pygame.K_d] or joy_right:
         player.vx += ship_speed
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
+    if keys[pygame.K_UP] or keys[pygame.K_w] or joy_up:
         player.vy -= ship_speed
-    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+    if keys[pygame.K_DOWN] or keys[pygame.K_s] or joy_down:
         player.vy += ship_speed
-    if keys[pygame.K_TAB]:
+    if keys[pygame.K_TAB] or joy_dodge:
         if frame_counter - frame_last_dodge > 60 * 5:
             frame_last_dodge = frame_counter
             if player.vx == 0 and player.vy == 0:
                 player.vx += ship_speed
             player.vx *= 25
             player.vy *= 25
-    if keys[pygame.K_SPACE]:
+    if keys[pygame.K_SPACE] or joy_shoot:
         if(frame_counter - frame_last_shot > 5):
             player_shoot()
             frame_last_shot = frame_counter
@@ -824,11 +906,13 @@ def collide():
                 boss.hp -= projectile.damage
                 # player_projectiles.remove(projectile)
                 projectile.hit = True
+                boss.frame_last_hit = frame_counter
             for trash_mob in trash_mobs:
                 if projectile_hits_ship(projectile, trash_mob):
                     # play the player hit sound
                     pygame.mixer.Sound.play(sound_player_hit)
                     trash_mob.hp -= projectile.damage
+                    trash_mob.frame_last_hit = frame_counter
                     # player_projectiles.remove(projectile)
                     projectile.hit = True
                     if trash_mob.hp <= 0:
@@ -847,6 +931,8 @@ def collide():
                 else:
                     pygame.mixer.Sound.play(sound_boss_hit)
                     projectile.damage -= player.defense_level
+                    projectile.damage = constrain(projectile.damage, 1, None)
+                    player.frame_last_hit = frame_counter
 
                 player.hp -= projectile.damage
 
@@ -1176,8 +1262,8 @@ def load_boss():
         boss.flip_h()
     elif sprite_selector == 1:
         boss.name = "Morpha"
-        boss.change_sprite("ships/ships_3.png", 1, 1,
-                           310, 150, (38, 37, 37), 1)
+        boss.change_sprite("ships/zombone.gif", 0, 0,
+                           128, 128, None, 2)
         boss.flip_h()
     elif sprite_selector == 2:
         boss.name = "DVD Dreadnaught"
@@ -1191,8 +1277,8 @@ def load_boss():
 
     elif sprite_selector == 4:
         boss.name = "Alexander"
-        boss.change_sprite("ships/ships_3.png", 1, 150,
-                           310, 138, (38, 37, 37), 1)
+        boss.change_sprite("ships/Behemoth.gif", 0, 0,
+                           190, 96, None, 1)
         boss.flip_h()
 
     elif sprite_selector == 5:
@@ -1522,6 +1608,15 @@ controls = load_image("sprites/jwd-move.png")
 # boss.flip_h()
 boss.x = boss_start_position()
 boss.y = height/2
+
+# start joystick control and select the default joystick
+joystick = None
+try:
+    pygame.joystick.init()
+    joystick = pygame.joystick.Joystick(0)
+except:
+    print("No joystick found.")
+    joystick = None
 
 # Begin main loop
 while not done:
