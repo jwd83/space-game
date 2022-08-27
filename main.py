@@ -4,6 +4,24 @@
 # pixelator : http://pixelatorapp.com/
 # sound resources : https://www.sounds-resource.com/
 
+
+# xbox 360 controller notes
+
+# get_button map
+# A button - 0   (defense upgrade/dodge)
+# B button - 1
+# X button - 2   (shoot)
+# Y button - 3   (weapon upgrade/??)
+# LB button - 4
+# RB button - 5
+# Back button - 6
+# Start button - 7
+# Left stick (clicked in) - 8
+# Right stick (clicked in) - 9
+# guide button - 10
+
+# dpad is hat 0
+
 import pygame
 import random
 import math
@@ -422,19 +440,6 @@ def handle_game_inputs():
     # reset ship motion
     player.vx = 0
     player.vy = 0
-
-    # xbox 360 controller map
-    # A button - 0   (dodge)
-    # B button - 1
-    # X button - 2   (shoot)
-    # Y button - 3
-    # LB button - 4
-    # RB button - 5
-    # Back button - 6
-    # Start button - 7
-    # Left stick (clicked in) - 8
-    # Right stick (clicked in) - 9
-    # guide button - 10
 
     # handle key presses
     keys = pygame.key.get_pressed()
@@ -1149,7 +1154,15 @@ def run_title_screen():
 
     # check for key press of space
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_SPACE]:
+
+    joy_shoot = False
+
+    # check if the X button was pressed on the xbox controller
+    if joystick is not None:
+        if joystick.get_button(2):
+            joy_shoot = True
+
+    if keys[pygame.K_SPACE] or joy_shoot:
         # start music
         # select a random song from the JUKEBOX list
 
@@ -1385,7 +1398,15 @@ def run_game_over_screen():
 
     # check for enter key to start a new game
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_RETURN]:
+
+    # check for joystick input
+    joy_weapon_upgrade = False
+
+    if joystick is not None:
+        if joystick.get_button(3):
+            joy_weapon_upgrade = True
+
+    if keys[pygame.K_RETURN] or joy_weapon_upgrade:
         background_speed = 1
         player.hp = player.max_hp
         boss.hp = boss.max_hp
@@ -1431,11 +1452,21 @@ def run_level_up_screen():
 
     # check for enter key to level up weapon
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_RETURN]:
+
+    # check for joystick input
+    joy_weapon_upgrade = False
+    joy_defense_upgrade = False
+    if joystick is not None:
+        if joystick.get_button(0):
+            joy_defense_upgrade = True
+        if joystick.get_button(3):
+            joy_weapon_upgrade = True
+
+    if keys[pygame.K_RETURN] or joy_weapon_upgrade:
         player.weapon_level += 1
 
     # check for tab key to level up defense
-    if keys[pygame.K_TAB]:
+    if keys[pygame.K_TAB] or joy_defense_upgrade:
         player.defense_level += 1
         player.max_hp += 5
         player.hp = player.max_hp
@@ -1448,7 +1479,7 @@ def run_level_up_screen():
         player.hp = player.max_hp
 
     # check for a key press of either enter or tab to start the next level
-    if keys[pygame.K_RETURN] or keys[pygame.K_TAB]:
+    if keys[pygame.K_RETURN] or keys[pygame.K_TAB] or joy_weapon_upgrade or joy_defense_upgrade:
 
         player.x = width * 1.5
         player.y = height / 2 - player.h * player.scale / 2
