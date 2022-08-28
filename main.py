@@ -46,6 +46,8 @@ state_start_frame = 0
 starfield_size = 300
 volume: int = 10
 cool_down_dodge = 60 * 2.5
+fps = 60
+base_fps = 60
 
 
 BACKGROUND_SPEED_NORMAL = 1.0
@@ -115,6 +117,14 @@ MOB_TYPE_HANGING = 2
 # MOB_TYPE_SNARE = 5
 
 
+def fps_divisor():
+    return base_fps / fps
+
+
+def fps_scaler():
+    return fps / base_fps
+
+
 def boss_start_position():
     return width - boss.w * boss.scale - 100
 
@@ -158,8 +168,8 @@ class SpaceObject:
         self.y = random.randint(-20, 600)
 
     def move(self):
-        self.x += self.vx * background_speed
-        self.y += self.vy * background_speed
+        self.x += self.vx * background_speed * fps_divisor()
+        self.y += self.vy * background_speed * fps_divisor()
 
         if self.x < -width:
             self.resize()
@@ -192,7 +202,7 @@ class Star:
             self.b = random.randrange(80, 255) * self.speed/10
 
     def move(self):
-        self.x -= self.speed * background_speed
+        self.x -= self.speed * background_speed * fps_divisor()
 
         if(self.x < 0 - ((self.size + self.speed) * background_speed)):
             self.x = width + self.speed + \
@@ -306,10 +316,10 @@ class Ship:
             self.h = self.sprite.get_height() / self.scale
 
     def move(self, edge_bound=True):
-        self.x += self.vx
+        self.x += self.vx * fps_divisor()
 
         if self.type == MOB_TYPE_BOSS or self.type == MOB_TYPE_PLAYER:
-            self.y += self.vy
+            self.y += self.vy * fps_divisor()
 
         if self.type == MOB_TYPE_BASIC:
             if self.base_y is None:
@@ -412,8 +422,8 @@ class Projectile:
                 self.vx *= self.acceleration
                 self.vy *= self.acceleration
 
-        self.x += self.vx
-        self.y += self.vy
+        self.x += self.vx * fps_divisor()
+        self.y += self.vy * fps_divisor()
 
         if(self.x < (0 - self.radius) or self.x > (width + self.radius) or self.y < (0 - self.radius) or self.y > (height + self.radius)):
             return True
@@ -432,13 +442,8 @@ class Projectile:
                 if self.type == PROJECTILE_TYPE_CIRCLE:
                     pygame.draw.circle(screen, self.color,
                                        (self.x, self.y), self.radius)
-                    # pygame.draw.circle(screen, (self.color[0]*0.5, self.color[1]*0.5, self.color[2]*0.5),
-                    #                    (self.x, self.y), self.radius,
-                    #                    width=4)
 
                 elif self.type == PROJECTILE_TYPE_MEATBALL:
-                    # screen.blit(meatball, (self.x - meatball.get_width() /
-                    #             2, self.y - meatball.get_height() / 2))
                     self.blitRotateCenter(
                         meatball,
                         (self.x - meatball.get_width() / 2,
@@ -558,14 +563,14 @@ def handle_game_inputs():
     if keys[pygame.K_DOWN] or keys[pygame.K_s] or joy_down:
         player.vy += ship_speed
     if keys[pygame.K_TAB] or joy_dodge:
-        if frame_counter - frame_last_dodge > cool_down_dodge:
+        if frame_counter - frame_last_dodge > cool_down_dodge * fps_scaler():
             frame_last_dodge = frame_counter
             if player.vx == 0 and player.vy == 0:
                 player.vx += ship_speed
-            player.vx *= 25
-            player.vy *= 25
+            player.vx *= 25 * fps_scaler()
+            player.vy *= 25 * fps_scaler()
     if keys[pygame.K_SPACE] or joy_shoot:
-        if(frame_counter - frame_last_shot > 5):
+        if(frame_counter - frame_last_shot > 5 * fps_scaler()):
             player_shoot()
             frame_last_shot = frame_counter
 
@@ -608,7 +613,7 @@ def handle_boss_logic():
         boss.vy = constrain(boss.vy, -max_velocity, max_velocity)
 
     # control the bosses shooting
-    if(frame_counter % constrain((13 - boss.level), 8, 13) == 0):
+    if(frame_counter % constrain((13 - boss.level) * fps_scaler(), 8 * fps_scaler(), 13 * fps_scaler()) == 0):
         if (random.randint(0, 100) < (50+int(boss.level/4))):
             boss_shoot()
 
@@ -1145,7 +1150,7 @@ def draw_screen():
         draw_hp_bar(BLUE, trash_mob)
 
     # draw the dodge cool down above the player
-    if frame_counter - frame_last_dodge < cool_down_dodge:
+    if frame_counter - frame_last_dodge < cool_down_dodge * fps_scaler():
 
         pygame.draw.rect(
             screen,
@@ -1154,7 +1159,8 @@ def draw_screen():
                 player.x,
                 player.y + player.h * player.scale + 11,
                 (player.w * player.scale) *
-                ((cool_down_dodge - (frame_counter - frame_last_dodge)) / cool_down_dodge),
+                ((cool_down_dodge * fps_scaler() - (frame_counter -
+                 frame_last_dodge)) / cool_down_dodge * fps_scaler()),
                 2
             )
         )
@@ -1173,12 +1179,25 @@ def draw_screen():
             )
         )
 
+    draw_score_line()
+
+    draw_boss_text()
+
+    # update the screen
+    pygame.display.flip()
+
+
+def draw_score_line():
     # draw the score line
     text_score_line = font.render(
         "Level: " + str(player.level) +
         "  Weapon: " + str(player.weapon_level) +
         "  Defense: " + str(player.defense_level) +
-        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp), True, (255, 255, 255))
+        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp) +
+        "  V: " + str(volume),
+        True,
+        (255, 255, 255)
+    )
 
     # draw your shield level
     if player.hp > player.max_hp:
@@ -1187,10 +1206,6 @@ def draw_screen():
         screen.blit(text_shield_level, (text_score_line.get_width() + 10, 680))
 
     screen.blit(text_score_line, (0, 680))
-    draw_boss_text()
-
-    # update the screen
-    pygame.display.flip()
 
 
 def draw_hp_bar(color, ship):
@@ -1260,12 +1275,6 @@ def run_title_screen():
             joy_shoot = True
 
     if keys[pygame.K_SPACE] or joy_shoot:
-        # start music
-        # select a random song from the JUKEBOX list
-
-        pygame.mixer.music.load(random.choice(JUKEBOX))
-        pygame.mixer.music.play()
-
         game_state = "start_level"
 
     # check for a key press of escape
@@ -1294,24 +1303,25 @@ def run_victory_screen():
     draw_starfield()
     draw_projectiles()
 
-    if (state_current_frame() / 10 % 2 == 1) and state_current_frame() < 100:
+    if (state_current_frame() / 10 % 2 == 1) and state_current_frame() < 100 * fps_scaler():
         boss.draw()
 
     # animate the player charging engines and zooming off
     if state_current_frame() == 0:
-        player.vx = (400 - player.x) / 150
-        player.vy = (height / 2 - player.y) / 150
+        player.vx = (400 - player.x) / (150 * fps_scaler())
+        player.vy = (height / 2 - player.y) / (150 * fps_scaler())
 
-    if state_current_frame() == 150:
+    if state_current_frame() >= 150 * fps_scaler():
         player.vx = -3
         player.vy = 0
 
-    if state_current_frame() > 150:
+    if state_current_frame() > 150 * fps_scaler():
         background_speed = constrain(
             background_speed * 0.99, 0.1, BACKGROUND_SPEED_WARP)
         player_projectiles = []
         # draw a circle expanding out from behind the player
-        flame_color_heating_up = 80 + (state_current_frame() - 150)
+        flame_color_heating_up = 80 + \
+            (state_current_frame() * fps_divisor() - 150)
         pygame.draw.circle(
             screen,
             (255, flame_color_heating_up, flame_color_heating_up),
@@ -1319,10 +1329,10 @@ def run_victory_screen():
             3 + (state_current_frame() - 150) / 8
         )
 
-    if state_current_frame() < 270:
+    if state_current_frame() < 270 * fps_scaler():
         player.move()
 
-    if state_current_frame() > 270:
+    if state_current_frame() > 270 * fps_scaler():
         player.x = width * 3
         background_speed = BACKGROUND_SPEED_WARP
         # draw a white box where the player left off from across the screen
@@ -1338,12 +1348,14 @@ def run_victory_screen():
         )
 
     # end the animation and go to the level up screen
-    if state_current_frame() >= 300:
+    if state_current_frame() >= 300 * fps_scaler():
         game_state = "level_up"
         load_boss()
 
     # draw the player
     player.draw()
+
+    draw_score_line()
 
     # update the screen
     pygame.display.flip()
@@ -1516,6 +1528,8 @@ def run_game_over_screen():
     if keys[pygame.K_ESCAPE]:
         game_state = "quit"
 
+    draw_score_line()
+
     # update the screen
     pygame.display.flip()
 
@@ -1588,6 +1602,8 @@ def run_level_up_screen():
     if keys[pygame.K_ESCAPE]:
         game_state = "quit"
 
+    draw_score_line()
+
     # update the screen
     pygame.display.flip()
 
@@ -1624,7 +1640,7 @@ def run_start_level_screen():
         elif boss_warning == 4:
             pygame.mixer.Sound.play(sfx['comm_bunny'])
 
-    if state_current_frame() > 20:
+    if state_current_frame() > 20 * fps_scaler():
         # draw the bosses name text below the threat detected text
         boss_name_text = font.render("It's " + boss.name, True, (255, 0, 0))
 
@@ -1633,6 +1649,8 @@ def run_start_level_screen():
 
     if background_speed == 1.0 and player.x == 100 and boss.x == boss_start_position():
         game_state = "game"
+
+    draw_score_line()
 
     # update the screen
     pygame.display.flip()
@@ -1860,7 +1878,7 @@ while not done:
               ", Game State: " + game_state)
 
     # limit to 60 frames per second
-    clock.tick(60)
+    clock.tick(fps)
 
 # quit pygame and clean up
 pygame.quit()
