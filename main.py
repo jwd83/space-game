@@ -1557,7 +1557,8 @@ def state_current_frame():
 print("Starting game...")
 pygame.init()
 print("pygame.init() complete. Setting up screen...")
-screen = pygame.display.set_mode((width, height+60))
+screen = pygame.display.set_mode(
+    (width, height+60), pygame.FULLSCREEN | pygame.SCALED)
 pygame.display.set_caption(
     "The Hunt for Roy Carnassus")
 print("Screen setup complete.")
