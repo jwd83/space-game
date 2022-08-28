@@ -576,7 +576,7 @@ def handle_game_inputs():
 
 
 def handle_game_events():
-    global done
+    global done, fps
     # handle events and key presses
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -586,6 +586,11 @@ def handle_game_events():
                 done = True
             if event.key == pygame.K_v:
                 change_volume()
+            if event.key == pygame.K_f:
+                if fps == 60:
+                    fps = 120
+                else:
+                    fps = 60
 
 
 # set to none if you do not wish to constrain
@@ -1189,23 +1194,32 @@ def draw_screen():
 
 def draw_score_line():
     # draw the score line
-    text_score_line = font.render(
+    text_score_line = font_small.render(
         "Level: " + str(player.level) +
         "  Weapon: " + str(player.weapon_level) +
         "  Defense: " + str(player.defense_level) +
-        "  HP: " + str(constrain(player.hp, -player.hp, player.max_hp)) + "/" + str(player.max_hp) +
-        "  V: " + str(volume),
+        "  HP: " + str(constrain(player.hp, -player.hp,
+                                 player.max_hp)) + "/" + str(player.max_hp),
         True,
         (255, 255, 255)
     )
 
     # draw your shield level
     if player.hp > player.max_hp:
-        text_shield_level = font.render(
+        text_shield_level = font_small.render(
             "+ " + str(player.hp-player.max_hp), True, (100, 100, 255))
         screen.blit(text_shield_level, (text_score_line.get_width() + 10, 680))
 
+    text_status_line = font_tiny.render(
+        "Volume: " + str(volume) + "%" +
+        "  FPS (Target): " + str(round(clock.get_fps())) +
+        " (" + str(fps) + ")",
+        True,
+        (180, 180, 180)
+    )
+
     screen.blit(text_score_line, (0, 680))
+    screen.blit(text_status_line, (0, 680+text_score_line.get_height()))
 
 
 def draw_hp_bar(color, ship):
@@ -1689,6 +1703,7 @@ print("Screen setup complete.")
 print("Generating font objects...")
 font = pygame.font.SysFont(None, FONT_SIZE_NORMAL)
 font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
+font_tiny = pygame.font.SysFont(None, FONT_SIZE_TINY)
 text_title_heading = font.render(
     "The Hunt for Roy Carnassus", True, (255, 255, 255))
 text_threat_detected = font.render(
