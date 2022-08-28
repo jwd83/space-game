@@ -5,6 +5,9 @@
 # sprite resources: https://www.spriters-resource.com/snes/superrtype/
 # pixelator : http://pixelatorapp.com/
 # sound resources : https://www.sounds-resource.com/
+# sprites/jwd-* Jared's sprites
+# sprites/mjd-* Michelle's sprites
+# sprites/parallax-space-* https://opengameart.org/content/space-background-3
 
 
 # xbox 360 controller notes
@@ -40,12 +43,15 @@ game_state = "title"
 last_game_state = "title"
 state_start_frame = 0
 starfield_size = 300
+volume: int = 10
 
 
 BACKGROUND_SPEED_NORMAL = 1.0
 BACKGROUND_SPEED_WARP = 10
+FONT_SIZE_LARGE = 64
 FONT_SIZE_NORMAL = 48
-FONT_SIZE_SMALL = 36
+FONT_SIZE_SMALL = 30
+FONT_SIZE_TINY = 24
 HEAL_CHANCE = 4
 SHOW_PROJECTILE_VALUES = False
 BOSS_BASE_HEALTH = 100
@@ -499,6 +505,8 @@ def handle_game_events():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 done = True
+            if event.key == pygame.K_v:
+                change_volume()
 
 
 # set to none if you do not wish to constrain
@@ -909,7 +917,7 @@ def collide():
         if not projectile.hit:
             if(projectile_hits_ship(projectile, boss)):
                 # play the player hit sound
-                pygame.mixer.Sound.play(sound_player_hit)
+                pygame.mixer.Sound.play(sfx['player_hit'])
                 boss.hp -= projectile.damage
                 # player_projectiles.remove(projectile)
                 projectile.hit = True
@@ -917,7 +925,7 @@ def collide():
             for trash_mob in trash_mobs:
                 if projectile_hits_ship(projectile, trash_mob):
                     # play the player hit sound
-                    pygame.mixer.Sound.play(sound_player_hit)
+                    pygame.mixer.Sound.play(sfx['player_hit'])
                     trash_mob.hp -= projectile.damage
                     trash_mob.frame_last_hit = frame_counter
                     # player_projectiles.remove(projectile)
@@ -934,9 +942,9 @@ def collide():
                 # play the boss hit sound effect
 
                 if projectile.damage < 0:
-                    pygame.mixer.Sound.play(sound_player_heal)
+                    pygame.mixer.Sound.play(sfx['player_heal'])
                 else:
-                    pygame.mixer.Sound.play(sound_boss_hit)
+                    pygame.mixer.Sound.play(sfx['boss_hit'])
                     projectile.damage -= player.defense_level
                     projectile.damage = constrain(projectile.damage, 1, None)
                     player.frame_last_hit = frame_counter
@@ -955,7 +963,6 @@ def update_game():
     # move the stars
     move_starfield()
 
-    handle_game_events()
     handle_game_inputs()
     handle_boss_logic()
 
@@ -1005,7 +1012,7 @@ def update_game():
     # check for player death
     if player.hp <= 0:
         # play the player death sound
-        pygame.mixer.Sound.play(sound_player_death)
+        pygame.mixer.Sound.play(sfx['player_death'])
         player.hp = 0
         game_state = "game_over"
         # boss_projectiles = []
@@ -1015,7 +1022,7 @@ def update_game():
     # check for level up
     if boss.hp <= 0:
         # play the boss death sound
-        pygame.mixer.Sound.play(sound_level_up)
+        pygame.mixer.Sound.play(sfx['level_up'])
         trash_mobs = []
         game_state = "victory"
         # clear active projectiles from the board
@@ -1135,8 +1142,6 @@ def run_title_screen():
     background_speed = constrain(
         background_speed * 1.01, 1, BACKGROUND_SPEED_WARP)
 
-    handle_game_events()
-
     # draw a starry background
     screen.fill(BLACK)
 
@@ -1189,7 +1194,6 @@ def draw_heading():
 
 def run_victory_screen():
     global game_state, background_speed, player_projectiles
-    handle_game_events()
 
     # draw a starry background
     screen.fill(BLACK)
@@ -1364,8 +1368,6 @@ def draw_starfield():
 def run_game_over_screen():
     global game_state, player, boss, boss_projectiles, background_speed
 
-    handle_game_events()
-
     # draw a starry background
     screen.fill(BLACK)
 
@@ -1429,8 +1431,6 @@ def run_game_over_screen():
 
 def run_level_up_screen():
     global game_state, player, boss, background_speed
-
-    handle_game_events()
 
     # draw a starry background
     screen.fill(BLACK)
@@ -1504,8 +1504,6 @@ def run_level_up_screen():
 def run_start_level_screen():
     global game_state, player, boss, background_speed
 
-    handle_game_events()
-
     background_speed = constrain(background_speed * 0.97, 1.0, None)
     player.x = constrain(player.x - (10 + 5 * background_speed), 100, None)
     boss.x = constrain(boss.x - (10 + 4 * background_speed),
@@ -1527,13 +1525,13 @@ def run_start_level_screen():
     if state_current_frame() == 0:
         boss_warning = boss.level % 4 + 1
         if boss_warning == 1:
-            pygame.mixer.Sound.play(sound_comm_bird)
+            pygame.mixer.Sound.play(sfx['comm_bird'])
         elif boss_warning == 2:
-            pygame.mixer.Sound.play(sound_comm_fox)
+            pygame.mixer.Sound.play(sfx['comm_fox'])
         elif boss_warning == 3:
-            pygame.mixer.Sound.play(sound_comm_bunny)
+            pygame.mixer.Sound.play(sfx['comm_bunny'])
         elif boss_warning == 4:
-            pygame.mixer.Sound.play(sound_comm_bunny)
+            pygame.mixer.Sound.play(sfx['comm_bunny'])
 
     if state_current_frame() > 20:
         # draw the bosses name text below the threat detected text
@@ -1551,6 +1549,22 @@ def run_start_level_screen():
 
 def state_current_frame():
     return frame_counter - state_start_frame
+
+
+def set_volume(level: int = 100):
+    global volume
+    volume = level
+    pygame.mixer.music.set_volume(volume / 100)
+    for sound in sfx:
+        sfx[sound].set_volume(volume / 100)
+
+
+def change_volume():
+    global volume
+    volume += 10
+    if volume > 100:
+        volume = 0
+    set_volume(volume)
 
 
 # start the game
@@ -1582,22 +1596,27 @@ text_level_armor = font.render('[tab] DEFENSE RESEARCH', True, (0, 255, 0))
 print("Font objects generated.")
 
 print("Loading sounds...")
-sound_player_hit = pygame.mixer.Sound('sounds/player_hit.wav')
-sound_player_death = pygame.mixer.Sound('sounds/player_death.wav')
-sound_boss_hit = pygame.mixer.Sound('sounds/boss_hit.wav')
-sound_player_heal = pygame.mixer.Sound('sounds/player_heal.wav')
-sound_comm_bird = pygame.mixer.Sound('sounds/comm-bird.ogg')
-sound_comm_bunny = pygame.mixer.Sound('sounds/comm-bunny.ogg')
-sound_comm_fox = pygame.mixer.Sound('sounds/comm-fox.ogg')
-sound_comm_frog = pygame.mixer.Sound('sounds/comm-frog.ogg')
 
+# make associative array of the sound effect files
+sfx = {
+    "player_hit": pygame.mixer.Sound('sounds/player_hit.wav'),
+    "player_death": pygame.mixer.Sound('sounds/player_death.wav'),
+    "boss_hit": pygame.mixer.Sound('sounds/boss_hit.wav'),
+    "player_heal": pygame.mixer.Sound('sounds/player_heal.wav'),
+    "comm_bird": pygame.mixer.Sound('sounds/comm-bird.ogg'),
+    "comm_bunny": pygame.mixer.Sound('sounds/comm-bunny.ogg'),
+    "comm_fox": pygame.mixer.Sound('sounds/comm-fox.ogg'),
+    "comm_frog": pygame.mixer.Sound('sounds/comm-frog.ogg'),
+    "level_up": pygame.mixer.Sound('sounds/level_up.wav'),
+}
 
-# sound_boss_death = pygame.mixer.Sound('sounds/boss_death.wav')
-sound_level_up = pygame.mixer.Sound('sounds/level_up.wav')
 print("Sounds loaded.")
+
 print("Increasing sound channels...")  # pygame defaults to 8, but we need more
 pygame.mixer.set_num_channels(32)
-print("Sound channels increased.")
+
+print("Setting volume levels...")
+set_volume(volume)
 
 print("Initializing game clock...")
 clock = pygame.time.Clock()
@@ -1614,7 +1633,7 @@ print("Seeding starfield...")
 for i in range(starfield_size):
     stars.append(Star())
 
-player = Ship("sprites/mjd-player.png", 0, 0, 58, 23, None, 1.4)
+player = Ship("sprites/mjd-apollo.png", scale=2)
 player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
 player.hp = player.max_hp
@@ -1654,6 +1673,8 @@ except:
 
 # Begin main loop
 while not done:
+
+    handle_game_events()
 
     # check the game state and perform the appropriate actions
     if game_state == "title":
