@@ -4,6 +4,7 @@
         "colorkey",
         "KEYDOWN",
         "Magnetek",
-        "pygame"
+        "pygame",
+        "retint"
     ]
 }

@@ -8,6 +8,7 @@
 # sprites/jwd-* Jared's sprites
 # sprites/mjd-* Michelle's sprites
 # sprites/parallax-space-* https://opengameart.org/content/space-background-3
+# sprites/planet*.png https://opengameart.org/content/20-planet-sprites
 
 
 # xbox 360 controller notes
@@ -44,6 +45,7 @@ last_game_state = "title"
 state_start_frame = 0
 starfield_size = 300
 volume: int = 10
+cool_down_dodge = 60 * 2.5
 
 
 BACKGROUND_SPEED_NORMAL = 1.0
@@ -60,6 +62,8 @@ BOSS_BASE_HEALTH = 100
 JUKEBOX = [
     'sounds/music-1-flashman.ogg',
     'sounds/music-2-topgear.ogg',
+    'sounds/music-3-zrms.ogg',
+    'sounds/music-4-wiley1.ogg',
 ]
 
 COMM_SOUNDS = [
@@ -115,6 +119,57 @@ def boss_start_position():
     return width - boss.w * boss.scale - 100
 
 
+class SpaceObject:
+    def __init__(self, name: str, x: int | None = None, y: int | None = None, vx: int | None = None, vy: int | None = None):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.name = name
+        self.sprite = None
+        # check for new start position
+        if self.x is None and self.y is None:
+            self.reset_position()
+        else:
+            # check for empty x or y
+            if self.x is None:
+                self.x = 0
+            if self.y is None:
+                self.y = 0
+        # check for empty vx or vy
+        if self.vx is None:
+            self.vx = -11
+        if self.vy is None:
+            self.vy = 0
+
+        self.resize()
+
+    def resize(self):
+        new_speed = random.randint(10, 16)
+
+        new_h = images[self.name].get_height() * new_speed / 40
+        new_w = images[self.name].get_width() * new_speed / 40
+
+        self.sprite = pygame.transform.scale(images[self.name], (new_h, new_w))
+        self.vx = abs(new_speed) * -1
+
+    def reset_position(self):
+        self.x = width + width * random.random() * 40
+        self.y = random.randint(-20, 600)
+
+    def move(self):
+        self.x += self.vx * background_speed
+        self.y += self.vy * background_speed
+
+        if self.x < -width:
+            self.resize()
+            self.reset_position()
+
+    def draw(self):
+        # screen.blit(images[self.name], (self.x, self.y))
+        screen.blit(self.sprite, (self.x, self.y))
+
+
 class Star:
     def __init__(self):
         self.x = random.randrange(0, width)
@@ -153,7 +208,7 @@ class Star:
         )
 
         # draw a a line from the center of the towards the right edge of the screen
-        if background_speed > 1.5:
+        if background_speed > 1.1:
             # pygame.draw.line(
             #     screen,
             #     (self.r, self.g, self.b),
@@ -172,6 +227,27 @@ class Star:
                     (self.x, self.y-self.size)
                 )
             )
+
+
+def tint(surf, r, g, b):
+    """surf: pygame.Surface to be reddened. The function returns a new surface."""
+    # making a red shade with transparency
+    redshade = pygame.Surface(surf.get_rect().size).convert_alpha()
+    redshade.fill((r, g, b, 100))  # red with alpha
+
+    # merging the alpha chanel of base image on the redshade, keeping minimum values (most transparent) in each pixel
+    alpha_basemask = pygame.surfarray.array_alpha(surf)
+    alpha_redmask = pygame.surfarray.pixels_alpha(redshade)
+    np.minimum(alpha_basemask, alpha_redmask, out=alpha_redmask)
+
+    # deleting the alpha_redmask reference to unlock redshade (or it cannot be blit)
+    del alpha_redmask
+
+    # reddening a copy of the original image
+    redsurf = surf.copy()
+    redsurf.blit(redshade, (0, 0))
+
+    return redsurf
 
 
 def reddening(surf):
@@ -419,10 +495,8 @@ def load_image(filename, x: int | None = None, y: int | None = None, w: int | No
 
 
 def move_starfield():
-    global galaxy1x
-    global galaxy1vx
-
-    galaxy1x -= galaxy1vx * background_speed
+    for so in space_objects:
+        so.move()
 
     for star in stars:
         star.move()
@@ -484,7 +558,7 @@ def handle_game_inputs():
     if keys[pygame.K_DOWN] or keys[pygame.K_s] or joy_down:
         player.vy += ship_speed
     if keys[pygame.K_TAB] or joy_dodge:
-        if frame_counter - frame_last_dodge > 60 * 5:
+        if frame_counter - frame_last_dodge > cool_down_dodge:
             frame_last_dodge = frame_counter
             if player.vx == 0 and player.vy == 0:
                 player.vx += ship_speed
@@ -959,7 +1033,7 @@ def collide():
 
 
 def update_game():
-    global game_state, boss_projectiles, player_projectiles, trash_mobs
+    global game_state, boss_projectiles, player_projectiles, trash_mobs, frame_last_dodge
     # move the stars
     move_starfield()
 
@@ -1013,6 +1087,7 @@ def update_game():
     if player.hp <= 0:
         # play the player death sound
         pygame.mixer.Sound.play(sfx['player_death'])
+        frame_last_dodge = -500
         player.hp = 0
         game_state = "game_over"
         # boss_projectiles = []
@@ -1068,6 +1143,21 @@ def draw_screen():
     draw_hp_bar(GREEN, player)
     for trash_mob in trash_mobs:
         draw_hp_bar(BLUE, trash_mob)
+
+    # draw the dodge cool down above the player
+    if frame_counter - frame_last_dodge < cool_down_dodge:
+
+        pygame.draw.rect(
+            screen,
+            PURPLE,
+            (
+                player.x,
+                player.y + player.h * player.scale + 11,
+                (player.w * player.scale) *
+                ((cool_down_dodge - (frame_counter - frame_last_dodge)) / cool_down_dodge),
+                2
+            )
+        )
 
     # draw the players shield level bar on the screen below the player
     if player.hp > player.max_hp:
@@ -1221,9 +1311,10 @@ def run_victory_screen():
             background_speed * 0.99, 0.1, BACKGROUND_SPEED_WARP)
         player_projectiles = []
         # draw a circle expanding out from behind the player
+        flame_color_heating_up = 80 + (state_current_frame() - 150)
         pygame.draw.circle(
             screen,
-            (255, 255, 255),
+            (255, flame_color_heating_up, flame_color_heating_up),
             (player.x, player.y + player.h * player.scale / 2),
             3 + (state_current_frame() - 150) / 8
         )
@@ -1356,13 +1447,13 @@ def get_roman_numeral(number):
 
 
 def draw_starfield():
-
-    # draw the galaxy1 in the furthest back layer
-    screen.blit(galaxy1, (galaxy1x, galaxy1y))
-
     # draw the stars
     for star in stars:
         star.draw()
+
+    # draw the nearfield space objects
+    for so in space_objects:
+        so.draw()
 
 
 def run_game_over_screen():
@@ -1597,7 +1688,7 @@ print("Font objects generated.")
 
 print("Loading sounds...")
 
-# make associative array of the sound effect files
+# make a dictionary of the sound effect files
 sfx = {
     "player_hit": pygame.mixer.Sound('sounds/player_hit.wav'),
     "player_death": pygame.mixer.Sound('sounds/player_death.wav'),
@@ -1609,6 +1700,35 @@ sfx = {
     "comm_frog": pygame.mixer.Sound('sounds/comm-frog.ogg'),
     "level_up": pygame.mixer.Sound('sounds/level_up.wav'),
 }
+
+# make a dictionary of various space images
+images = {
+    # "galaxy": load_image('sprites/parallax-space-background.png'),
+    # "near_planet": load_image('sprites/parallax-space-big-planet.png'),
+    # "far_planet": load_image('sprites/parallax-space-far-planets.png'),
+    # "ring_planet": load_image('sprites/parallax-space-ring-planet.png'),
+    "planet1": load_image('sprites/planet1.png'),
+    "planet2": load_image('sprites/planet2.png'),
+    "planet3": load_image('sprites/planet3.png'),
+    "planet4": load_image('sprites/planet4.png'),
+    "planet5": load_image('sprites/planet5.png'),
+    "planet6": load_image('sprites/planet6.png'),
+    "planet7": load_image('sprites/planet7.png'),
+    "planet10": load_image('sprites/planet10.png'),
+    "planet11": load_image('sprites/planet11.png'),
+    "planet12": load_image('sprites/planet12.png'),
+    "planet13": load_image('sprites/planet13.png'),
+    "planet14": load_image('sprites/planet14.png'),
+    "planet15": load_image('sprites/planet15.png'),
+    "planet16": load_image('sprites/planet16.png'),
+    "planet17": load_image('sprites/planet17.png'),
+    "planet18_0": load_image('sprites/planet18_0.png'),
+    "planet19": load_image('sprites/planet19.png'),
+    "planet20": load_image('sprites/planet20.png'),
+
+
+}
+
 
 print("Sounds loaded.")
 
@@ -1627,6 +1747,7 @@ stars = []
 player_projectiles = []
 boss_projectiles = []
 enemy_units = []
+space_objects = []
 
 
 print("Seeding starfield...")
@@ -1638,6 +1759,7 @@ player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
 player.hp = player.max_hp
 player.x = 100
+frame_last_dodge = -cool_down_dodge
 
 
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
@@ -1647,14 +1769,31 @@ boss.max_hp = BOSS_BASE_HEALTH
 boss.hp = boss.max_hp
 load_boss()
 
+# space_objects.append(SpaceObject('ring_planet'))
+# space_objects.append(SpaceObject('far_planet'))
+# space_objects.append(SpaceObject('near_planet'))
+space_objects.append(SpaceObject('planet1'))
+space_objects.append(SpaceObject('planet2'))
+space_objects.append(SpaceObject('planet3'))
+space_objects.append(SpaceObject('planet4'))
+space_objects.append(SpaceObject('planet5'))
+space_objects.append(SpaceObject('planet6'))
+space_objects.append(SpaceObject('planet7'))
+space_objects.append(SpaceObject('planet10'))
+space_objects.append(SpaceObject('planet11'))
+space_objects.append(SpaceObject('planet12'))
+space_objects.append(SpaceObject('planet13'))
+space_objects.append(SpaceObject('planet14'))
+space_objects.append(SpaceObject('planet15'))
+space_objects.append(SpaceObject('planet16'))
+space_objects.append(SpaceObject('planet17'))
+space_objects.append(SpaceObject('planet18_0'))
+space_objects.append(SpaceObject('planet19'))
+space_objects.append(SpaceObject('planet20'))
 
-galaxy1 = load_image("ships/galaxy2.png", 0, 0, 800, 424, None, 0.25)
-galaxy1x = width + 150
-galaxy1y = random.randint(1, int(height - galaxy1.get_height()))
-galaxy1vx = 1/30
 
 meatball = load_image("sprites/jwd-meatball.png")
-noodle = load_image("ships/macaroni.png", 0, 0, 1293, 1010, None, 0.03)
+noodle = load_image("ships/macaroni.png", scale=0.03)
 controls = load_image("sprites/jwd-move.png")
 
 
@@ -1671,10 +1810,18 @@ except:
     print("No joystick found.")
     joystick = None
 
+
+def handle_jukebox():
+    if not pygame.mixer.music.get_busy():
+        pygame.mixer.music.load(random.choice(JUKEBOX))
+        pygame.mixer.music.play()
+
+
 # Begin main loop
 while not done:
 
     handle_game_events()
+    handle_jukebox()
 
     # check the game state and perform the appropriate actions
     if game_state == "title":
