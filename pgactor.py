@@ -3,12 +3,13 @@ import os
 
 
 class Actor():
-    def __init__(self, folder, position, sheet: str = "idle", scale=1.0, dimensions=None):
+    def __init__(self, folder, position=(0, 0), sheet: str = "idle", scale=1.0, dimensions=None):
         self.x, self.y = position
         self.sheet: str = sheet
         self.frame: int = 0
         self.animation_rate = 1
         self.animation_length = 1
+        self.animation_completed = False
         self.sprites = {}
         self.scale = scale
         self.load_sheets(folder, dimensions)
@@ -17,8 +18,8 @@ class Actor():
     def set_sheet(self, sheet: str):
         self.sheet = sheet
         self.frame = 0
-
         self.animation_length = 0
+        self.animation_completed = False
         # check how many frames are in the sprite dictionary that start with the sheet name
         for key in self.sprites.keys():
             if key.startswith(self.sheet):
@@ -58,16 +59,30 @@ class Actor():
                             frame_key = frame_base_name + \
                                 "-" + str(frame_base_number)
 
-                            # add the surface to the dictionary
-                            # self.sprites[frame_key] = todo
+                            if self.scale == 1.0:
+                                self.sprites[frame_key] = frame.subsurface(
+                                    pygame.Rect(w * col, h * row, w, h))
+                            else:
+                                # capture the base frame
+                                base_frame = frame.subsurface(
+                                    pygame.Rect(w * col, h * row, w, h))
+
+                                # scale the base frame
+                                self.sprites[frame_key] = pygame.transform.scale(
+                                    base_frame, (int(base_frame.get_width() * self.scale), int(base_frame.get_height() * self.scale)))
+
                             frame_base_number += 1
 
     def move(self, vx, vy):
         self.x += vx
         self.y += vy
 
-    def reposition(self, position):
+    def reposition(self, position=(0, 0)):
         self.x, self.y = position
+
+    def reset_animation(self):
+        self.frame = 0
+        self.animation_completed = False
 
     def draw(self, surface):
 
@@ -80,3 +95,6 @@ class Actor():
         surface.blit(self.sprites[frame_key], (self.x, self.y))
 
         self.frame += 1
+
+        if self.frame >= self.animation_length * self.animation_rate:
+            self.animation_completed = True
