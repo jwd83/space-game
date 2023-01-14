@@ -13,7 +13,7 @@
 
 # xbox 360 controller notes
 
-# get_button map
+# get_button maplike 
 # A button - 0   (defense upgrade/dodge)
 # B button - 1
 # X button - 2   (shoot)
@@ -52,10 +52,12 @@ base_fps = 60
 
 BACKGROUND_SPEED_NORMAL = 1.0
 BACKGROUND_SPEED_WARP = 10
-FONT_SIZE_LARGE = 64
-FONT_SIZE_NORMAL = 48
-FONT_SIZE_SMALL = 30
-FONT_SIZE_TINY = 24
+
+FONT_SIZE_LARGE = 48
+FONT_SIZE_NORMAL = 24
+FONT_SIZE_SMALL = 16
+FONT_SIZE_TINY = 8
+
 HEAL_CHANCE = 4
 SHOW_PROJECTILE_VALUES = False
 BOSS_BASE_HEALTH = 100
@@ -1701,17 +1703,19 @@ pygame.display.set_caption(
 print("Screen setup complete.")
 
 print("Generating font objects...")
-font = pygame.font.SysFont(None, FONT_SIZE_NORMAL)
-font_small = pygame.font.SysFont(None, FONT_SIZE_SMALL)
-font_tiny = pygame.font.SysFont(None, FONT_SIZE_TINY)
-text_title_heading = font.render(
+font_large = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_LARGE)
+font = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_NORMAL)
+font_small = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_SMALL)
+font_tiny = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_TINY)
+
+text_title_heading = font_large.render(
     "The Hunt for Roy Carnassus", True, (255, 255, 255))
-text_threat_detected = font.render(
+text_threat_detected = font_large.render(
     "THREAT DETECTED !!", True, (255, 0, 0))
-text_title_start = font.render(
+text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
-text_quit_key = font.render('[escape] TO QUIT', True, (255, 255, 255))
-text_ship_destroyed = font.render('SHIP DESTROYED!', True, (255, 0, 0))
+text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
+text_ship_destroyed = font_large.render('SHIP DESTROYED!', True, (255, 0, 0))
 text_journey_again = font.render(
     '[enter] TO JOURNEY AGAIN', True, (0, 255, 255))
 text_level_up = font.render('LEVEL UP!', True, (0, 255, 255))
