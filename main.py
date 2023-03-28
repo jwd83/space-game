@@ -13,7 +13,7 @@
 
 # xbox 360 controller notes
 
-# get_button maplike 
+# get_button maplike
 # A button - 0   (defense upgrade/dodge)
 # B button - 1
 # X button - 2   (shoot)
@@ -1384,7 +1384,7 @@ def load_boss():
     enemy_units = []
 
     # select the boss and name it
-    boss_divisor = 10
+    boss_divisor = 13
     sprite_selector = boss.level % boss_divisor
 
     boss_name_mark = 0
@@ -1399,25 +1399,24 @@ def load_boss():
                            304, 256, None, 1)
         boss.flip_h()
     elif sprite_selector == 1:
-        boss.name = "Morpha"
-        boss.change_sprite("ships/zombone.gif", 0, 0,
-                           128, 128, None, 2)
-        boss.flip_h()
+        boss.name = "Doge"
+        boss.change_sprite("ships/doge.png", 0, 0,
+                           240, 174, None, 1)
+
     elif sprite_selector == 2:
         boss.name = "DVD Dreadnaught"
         boss.change_sprite("ships/dvd.png", 1, 1, 1600, 740, None, 0.2)
 
     elif sprite_selector == 3:
-        boss.name = "Odin"
-        boss.change_sprite("ships/atma.gif", 0, 0,
-                           256, 256, None, 1)
-        boss.flip_h()
+        boss.name = "Sus Man"
+        boss.change_sprite("ships/susman.png", 0, 0,
+                           192, 231, None, 1)
+
 
     elif sprite_selector == 4:
-        boss.name = "Alexander"
-        boss.change_sprite("ships/Behemoth.gif", 0, 0,
-                           190, 96, None, 1)
-        boss.flip_h()
+        boss.name = "Evil Car"
+        boss.change_sprite("ships/evil-car.png", 0, 0,
+                           240, 131, None, 1)
 
     elif sprite_selector == 5:
         boss.name = "Rathtar Overlord"
@@ -1444,6 +1443,25 @@ def load_boss():
         boss.name = "Zone Eater"
         boss.change_sprite("ships/zone-eater.gif", 0, 0,
                            190, 144, None, 1)
+        boss.flip_h()
+
+    elif sprite_selector == 10:
+        boss.name = "Morpha"
+        boss.change_sprite("ships/zombone.gif", 0, 0,
+                           128, 128, None, 2)
+        boss.flip_h()
+
+    elif sprite_selector == 11:
+        boss.name = "Odin"
+        boss.change_sprite("ships/atma.gif", 0, 0,
+                           256, 256, None, 1)
+        boss.flip_h()
+
+    elif sprite_selector == 12:
+
+        boss.name = "Alexander"
+        boss.change_sprite("ships/Behemoth.gif", 0, 0,
+                           190, 96, None, 1)
         boss.flip_h()
 
     boss.mask = pygame.mask.from_surface(boss.sprite)
@@ -1517,7 +1535,6 @@ def run_game_over_screen():
                     height / 2 - text_quit_key.get_height()/2 + 50))
 
     draw_boss_text()
-    draw_heading()
 
     # check for enter key to start a new game
     keys = pygame.key.get_pressed()
@@ -1532,7 +1549,7 @@ def run_game_over_screen():
     if keys[pygame.K_RETURN] or joy_weapon_upgrade:
         background_speed = 1
         player.hp = player.max_hp
-        boss.hp = boss.max_hp
+        # boss.hp = boss.max_hp
         player.x = 100
         player.y = height / 2 - player.h * player.scale / 2
         boss.x = boss_start_position()
@@ -1658,7 +1675,7 @@ def run_start_level_screen():
 
     if state_current_frame() > 20 * fps_scaler():
         # draw the bosses name text below the threat detected text
-        boss_name_text = font.render("It's " + boss.name, True, (255, 0, 0))
+        boss_name_text = font_large.render(boss.name, True, (255, 0, 0))
 
         screen.blit(boss_name_text, (width / 2 -
                     boss_name_text.get_width()/2, 150))
@@ -1710,13 +1727,13 @@ font_tiny = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_TINY)
 
 text_title_heading = font_large.render(
     "The Hunt for Roy Carnassus", True, (255, 255, 255))
-text_threat_detected = font_large.render(
-    "THREAT DETECTED !!", True, (255, 0, 0))
+text_threat_detected = font.render(
+    "THREAT DETECTED !! Sensors show incoming", True, (255, 0, 0))
 text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
 text_ship_destroyed = font_large.render('SHIP DESTROYED!', True, (255, 0, 0))
-text_journey_again = font.render(
+text_journey_again = font_large.render(
     '[enter] TO JOURNEY AGAIN', True, (0, 255, 255))
 text_level_up = font.render('LEVEL UP!', True, (0, 255, 255))
 text_level_weapon = font.render('[enter] WEAPON RESEARCH', True, (0, 255, 255))
