@@ -9,6 +9,7 @@
 # sprites/mjd-* Michelle's sprites
 # sprites/parallax-space-* https://opengameart.org/content/space-background-3
 # sprites/planet*.png https://opengameart.org/content/20-planet-sprites
+# sprites/kenney* https://www.kenney.nl/assets/space-shooter-extension & https://www.kenney.nl/assets/space-shooter-redux
 
 
 # xbox 360 controller notes
@@ -96,18 +97,12 @@ BLACK = (0, 0, 0)
 
 
 # enumerate the projectile types
-PROJECTILE_TYPE_CIRCLE = 1
-PROJECTILE_TYPE_MEATBALL = 2
-PROJECTILE_TYPE_NOODLE = 3
-PROJECTILE_TYPE_FOOTBALL = 4
-PROJECTILE_TYPE_BASEBALL = 5
-PROJECTILE_TYPE_BASKETBALL = 6
-PROJECTILE_TYPE_VOLLEYBALL = 7
-PROJECTILE_TYPE_SOCCER_BALL = 8
-PROJECTILE_TYPE_BOMB = 9
-PROJECTILE_TYPE_JAR = 10
-PROJECTILE_TYPE_MIRV = 11
-PROJECTILE_TYPE_TORPEDO = 12
+class ProjectileType:
+    Circle = 1
+    Meatball = 2
+    Noodle = 3
+    PlayerTorpedo = 4
+
 
 # enumerate the trash mob types
 MOB_TYPE_BOSS = -1
@@ -397,7 +392,7 @@ class Ship:
 
 
 class Projectile:
-    def __init__(self, x, y, vx, vy, damage, color, radius, acceleration=1.0, type=PROJECTILE_TYPE_CIRCLE):
+    def __init__(self, x, y, vx, vy, damage, color, radius, acceleration=1.0, type=ProjectileType.Circle):
         self.x = x
         self.y = y
         self.vx = vx
@@ -441,24 +436,37 @@ class Projectile:
                     screen, GREEN, (self.x, self.y), self.radius)
             else:
                 # otherwise, draw my circle normally
-                if self.type == PROJECTILE_TYPE_CIRCLE:
-                    pygame.draw.circle(screen, self.color,
-                                       (self.x, self.y), self.radius)
+                match self.type:
 
-                elif self.type == PROJECTILE_TYPE_MEATBALL:
-                    self.blitRotateCenter(
-                        meatball,
-                        (self.x - meatball.get_width() / 2,
-                         self.y - meatball.get_height() / 2),
-                        frame_counter % 360
-                    )
-                elif self.type == PROJECTILE_TYPE_NOODLE:
-                    self.blitRotateCenter(
-                        noodle,
-                        (self.x - noodle.get_width() / 2,
-                         self.y - noodle.get_height() / 2),
-                        frame_counter % 360
-                    )
+                    case ProjectileType.Circle:
+                        pygame.draw.circle(screen, self.color,
+                                        (self.x, self.y), self.radius)
+
+                    case ProjectileType.Meatball:
+                        self.blitRotateCenter(
+                            meatball,
+                            (self.x - meatball.get_width() / 2,
+                            self.y - meatball.get_height() / 2),
+                            frame_counter % 360
+                        )
+                    case ProjectileType.Noodle:
+                        self.blitRotateCenter(
+                            noodle,
+                            (self.x - noodle.get_width() / 2,
+                            self.y - noodle.get_height() / 2),
+                            frame_counter % 360
+                        )
+                    case ProjectileType.PlayerTorpedo:
+                        angle = 180 if self.vx < 0 else 0 # if shot left, rotate 180 else 0
+                        self.blitRotateCenter(
+                            player_torpedo,
+                            (self.x - player_torpedo.get_width() / 2,
+                            self.y - player_torpedo.get_height() / 2),
+                            angle
+                        )
+                    case _:
+                        pygame.draw.circle(screen, self.color,
+                                        (self.x, self.y), self.radius)
         else:
             if(self.damage < 0):
                 # if my damage is negative (healing), draw a green value
@@ -683,7 +691,8 @@ def player_shoot():
             player.weapon_level*3,
             WHITE,
             6,
-            20
+            20,
+            projectile_type=ProjectileType.PlayerTorpedo
         )
     )
 
@@ -727,7 +736,8 @@ def player_shoot():
                 6,
                 20,
                 ox=-5,
-                oy=-15
+                oy=-15,
+                projectile_type=ProjectileType.PlayerTorpedo
             )
         )
 
@@ -743,7 +753,8 @@ def player_shoot():
                 6,
                 20,
                 ox=-5,
-                oy=15
+                oy=15,
+                projectile_type=ProjectileType.PlayerTorpedo
             )
         )
 
@@ -790,7 +801,7 @@ def fire_projectile(
     speed,
     accel=1.0,
     can_heal=False,
-    projectile_type=PROJECTILE_TYPE_CIRCLE,
+    projectile_type=ProjectileType.Circle,
     ox=0,
     oy=0
 ):
@@ -861,15 +872,15 @@ def boss_shoot():
     # global boss_projectiles
 
     # set default attack to circle
-    projectile_type = PROJECTILE_TYPE_CIRCLE
+    projectile_type = ProjectileType.Circle
 
     # if it's the flying spaghetti monster, set the attack type to a meatball
     if boss.level == 8:
         # 50/50 chance to shoot a meatball or a noodle
         if random.randint(0, 100) < 50:
-            projectile_type = PROJECTILE_TYPE_MEATBALL
+            projectile_type = ProjectileType.Meatball
         else:
-            projectile_type = PROJECTILE_TYPE_NOODLE
+            projectile_type = ProjectileType.Noodle
 
     # shoot a projectile from the boss straight ahead
     boss_projectiles.append(
@@ -972,7 +983,7 @@ def projectile_hits_ship(projectile, ship):
     # if it appears the projectile is inside the box perform a collision against the mask
     if distance <= projectile_r:
 
-        if projectile.type == PROJECTILE_TYPE_CIRCLE or projectile.damage < 0:
+        if projectile.type == ProjectileType.Circle or projectile.damage < 0 or projectile.type == ProjectileType.PlayerTorpedo:
             # if the projectile is a circle, perform a circle collision
             # against the mask of a circle. begin by drawing the bullet
             # collision mask
@@ -1101,6 +1112,7 @@ def update_game():
         pygame.mixer.Sound.play(sfx['player_death'])
         frame_last_dodge = -500
         player.hp = 0
+        player.deaths += 1
         game_state = "game_over"
         # boss_projectiles = []
         player_projectiles = []
@@ -1197,9 +1209,10 @@ def draw_screen():
 def draw_score_line():
     # draw the score line
     text_score_line = font_small.render(
-        "Level: " + str(player.level) +
-        "  Weapon: " + str(player.weapon_level) +
-        "  Defense: " + str(player.defense_level) +
+        "Deaths: " + str(player.deaths) +
+        # "Level: " + str(player.level) +
+        "  Weapons: " + str(player.weapon_level) +
+        "  Defense: " + str(player.defense_level + 1) +
         "  HP: " + str(constrain(player.hp, -player.hp,
                                  player.max_hp)) + "/" + str(player.max_hp),
         True,
@@ -1251,7 +1264,7 @@ def draw_hp_bar(color, ship):
 
 def draw_boss_text():
 
-    text_boss_line = font.render(
+    text_boss_line = font_small.render(
         boss.name + " HP: " + "{:0.0f}".format(boss.hp), True, (255, 100, 100))
 
     screen.blit(text_boss_line, (width - text_boss_line.get_width(), 680))
@@ -1646,7 +1659,7 @@ def run_start_level_screen():
 
     background_speed = constrain(background_speed * 0.97, 1.0, None)
     player.x = constrain(player.x - (10 + 5 * background_speed), 100, None)
-    boss.x = constrain(boss.x - (10 + 4 * background_speed),
+    boss.x = constrain(boss.x - (10 + 3 * background_speed),
                        boss_start_position(), None)
     move_starfield()
 
@@ -1708,6 +1721,9 @@ def change_volume():
         volume = 0
     set_volume(volume)
 
+###############################################################################
+# main entry point for the game
+###############################################################################
 
 # start the game
 print("Starting game...")
@@ -1728,7 +1744,7 @@ font_tiny = pygame.font.Font('fonts/PressStart2P.ttf', FONT_SIZE_TINY)
 text_title_heading = font_large.render(
     "The Hunt for Roy Carnassus", True, (255, 255, 255))
 text_threat_detected = font.render(
-    "THREAT DETECTED !! Sensors show incoming", True, (255, 0, 0))
+    "THREAT DETECTED !! Sensors indicate...", True, (255, 255, 255), (255,0,0))
 text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
@@ -1808,11 +1824,14 @@ print("Seeding starfield...")
 for i in range(starfield_size):
     stars.append(Star())
 
-player = Ship("sprites/mjd-apollo.png", scale=2)
+player = Ship("ships/kenney-ship-3.png", scale=0.5)
 player.type = MOB_TYPE_PLAYER
 player.max_hp = 15
 player.hp = player.max_hp
 player.x = 100
+player.deaths = 0
+player.score = 0
+
 frame_last_dodge = -cool_down_dodge
 
 
@@ -1849,6 +1868,7 @@ space_objects.append(SpaceObject('planet20'))
 meatball = load_image("sprites/jwd-meatball.png")
 noodle = load_image("ships/macaroni.png", scale=0.03)
 controls = load_image("sprites/jwd-move.png")
+player_torpedo = load_image("sprites/kenney-player-torpedo.png")
 
 
 # boss.flip_h()
