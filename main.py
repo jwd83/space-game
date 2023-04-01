@@ -37,6 +37,15 @@ import time
 import datetime
 import os
 
+
+# class for boss configuration
+class Boss:
+    def __init__(self, name, hp, sprite):
+        self.name = name
+        self.hp = hp
+        self.sprite = sprite
+
+
 # enumerate the projectile types
 class ProjectileType:
     Circle = 1
@@ -104,6 +113,34 @@ COMM_SOUNDS = [
 ]
 
 trash_mobs = []
+
+upgrades = [
+    {
+        'name': 'Attack Up',
+        'info_1': 'Increases your attack',
+        'info_2': 'power making your ship',
+        'info_3': 'deal more damage.',
+    },
+    {
+        'name': 'Forward Canon',
+        'info_1': 'Fire an additional',
+        'info_2': 'forward canon.',
+        'info_3': '100 Potency',
+    },
+    {
+        'name': 'Aimed Shot',
+        'info_1': 'Add a high accuracy',
+        'info_2': 'but low potency.',
+        'info_3': '40 Potency',
+
+    },
+    {
+        'name': 'Wild Shot Canon',
+        'info_1': 'An unpredictable but',
+        'info_2': 'powerful attack.',
+        'info_3': '160 Potency',
+    },
+]
 
 # classes
 
@@ -1307,6 +1344,10 @@ def run_title_screen():
                 (width / 2 - text_title_start.get_width()/2,
                  height / 2 - text_title_start.get_height()/2))
 
+    screen.blit(text_title_dodge,
+                (width / 2 - text_title_dodge.get_width()/2,
+                 height / 2 - text_title_dodge.get_height()/2 + 50))
+
     screen.blit(controls, (width / 2 - controls.get_width() / 2, 400))
 
     draw_heading()
@@ -1653,19 +1694,59 @@ def run_level_up_screen():
     screen.fill(BLACK)
 
     move_starfield()
-
     draw_starfield()
 
-    screen.blit(text_level_up,
-                (width / 2 - text_level_up.get_width()/2,
-                 height / 2 - text_level_up.get_height()/2-100))
+    screen.blit(text_level_up, (width / 2 - text_level_up.get_width() / 2, 25))
+    screen.blit(text_level_select_an_upgrade, (width / 2 - text_level_up.get_width() / 2, 75))
 
-    screen.blit(text_level_weapon,
-                (width / 2 - text_level_weapon.get_width()/2,
-                 height / 2 - text_level_weapon.get_height()/2))
-    screen.blit(text_level_armor,
-                (width / 2 - text_level_armor.get_width()/2,
-                 height / 2 - text_level_armor.get_height()/2+100))
+    # draw 4 boxes for the player to choose upgrades from
+    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100, 400, 200), 2)
+    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 100, 400, 200), 2)
+    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 200, 400, 200), 2)
+    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 300, 400, 200), 2)
+
+    card_spacing = int(width / 5)
+    card_width = 200
+    card_height = 400
+
+    for i in range(4):
+        card_top = 128
+        card_center = card_spacing * (i + 1)
+        card_left = card_spacing * (i + 1) - card_width / 2
+        color = GREEN
+        match i:
+            case 0:
+                color = YELLOW
+            case 1:
+                color = GREEN
+            case 2:
+                color = RED
+            case 3:
+                color = BLUE
+
+        # draw the card border
+        pygame.draw.rect(screen, color, (card_left, card_top, card_width, card_height), 3, 10)
+
+        # draw the number of the card at the top center of the card
+        text_card_number = font.render(str(i + 1), True, color)
+        screen.blit(text_card_number, (card_center - text_card_number.get_width() / 2, card_top + 10))
+        screen.blit(text_card_number, (card_center - text_card_number.get_width() / 2, card_top + card_height - text_card_number.get_height() - 10))
+
+        # draw a line above and below the card number
+        top_line_y = card_top + text_card_number.get_height() + 20
+        bottom_line_y = card_top + card_height - text_card_number.get_height() - 20
+        pygame.draw.line(screen, color, (card_left, top_line_y), (card_left + card_width - 1, top_line_y), 3)
+        pygame.draw.line(screen, color, (card_left, bottom_line_y), (card_left + card_width - 1, bottom_line_y), 3)
+
+
+
+    # pygame.draw.rect(screen, GREEN, (100, 100, 225, 400), 3, 10)
+    # pygame.draw.rect(screen, RED, (400, 100, 225, 400), 3, 10)
+    # pygame.draw.rect(screen, GREEN, (400, 100, 225, 400), 3, 10)
+    # pygame.draw.rect(screen, GREEN, (400, 100, 225, 400), 3, 10)
+
+    screen.blit(text_level_weapon, (width / 2 - text_level_weapon.get_width() / 2, 550))
+    screen.blit(text_level_armor, (width / 2 - text_level_armor.get_width() / 2, 600))
 
     # it will be technically possible to get a frame perfect double level up
 
@@ -1815,11 +1896,15 @@ text_threat_detected = font.render(
     "THREAT DETECTED !! Sensors indicate...", True, (255, 255, 255), (255,0,0))
 text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
+text_title_dodge = font_large.render(
+    '[tab] TO DODGE', True, (0, 255, 255))
+
 text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
 text_ship_destroyed = font_large.render('SHIP DESTROYED!', True, (255, 0, 0))
 text_journey_again = font_large.render(
     '[enter] TO JOURNEY AGAIN', True, (0, 255, 255))
-text_level_up = font.render('LEVEL UP!', True, (0, 255, 255))
+text_level_up = font_large.render('LEVEL UP!', True, (0, 255, 255))
+text_level_select_an_upgrade = font.render('SELECT AN UPGRADE', True, (0, 255, 255))
 text_level_weapon = font.render('[enter] WEAPON RESEARCH', True, (0, 255, 255))
 text_level_armor = font.render('[tab] DEFENSE RESEARCH', True, (0, 255, 0))
 print("Font objects generated.")

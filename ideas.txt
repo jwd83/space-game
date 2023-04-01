@@ -1,0 +1,18 @@
+upgrades at end of level are from a selection of random upgrades
+
+weapon upgrade ideas
+  damage up
+  attack speed
+  gun types
+    forward gun 100% potency
+    homing gun 33% potency
+    wild gun 150% potency
+    spread gun 10% potency
+
+
+
+defensive upgrades
+  health up
+  dodge cdr
+  dodge itime up
+
