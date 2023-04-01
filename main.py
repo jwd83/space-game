@@ -1347,7 +1347,7 @@ def run_ending_screen():
     text_congratulations = font_large.render(CONGRATULATIONS, True, (255, 255, 255))
     screen.blit(text_congratulations, (width / 2 - text_congratulations.get_width()/2, 50))
 
-    ending_dialog =[
+    ending_dialog = [
         "As Captain Jack lands the final blow on Roy Carnassus, the tyrant's",
         "body crumbles into a cloud of cosmic dust. The galaxy is saved, and",
         "the universe is at peace. Captain Jack is hailed as a hero, and the",
@@ -1365,7 +1365,6 @@ def run_ending_screen():
         "Defense: " + str(player.defense_level + 1),
         "",
         "[escape] TO QUIT"
-
     ]
 
     for i in range(len(ending_dialog)):
