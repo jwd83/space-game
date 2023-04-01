@@ -33,6 +33,27 @@ import pygame
 import random
 import math
 import numpy as np
+import time
+import datetime
+import os
+
+# enumerate the projectile types
+class ProjectileType:
+    Circle = 1
+    Meatball = 2
+    Noodle = 3
+    PlayerTorpedo = 4
+
+# enumerate the game states
+class GameState:
+    Title = 1
+    Game = 2
+    Victory = 3
+    LevelUp = 4
+    GameOver = 5
+    StartLevel = 6
+    Quit = 7
+    Ending = 8
 
 width = 1280
 height = 660
@@ -41,14 +62,18 @@ background_speed = 1.0
 frame_counter = 0
 frame_last_shot = 0
 frame_last_dodge = 0
-game_state = "title"
-last_game_state = "title"
+game_state = GameState.Title
+last_game_state = game_state
 state_start_frame = 0
+state_start_time = time.time()
 starfield_size = 300
 volume: int = 10
 cool_down_dodge = 60 * 2.5
 fps = 60
 base_fps = 60
+damage_done = 0
+last_damage_done = 0
+dps = 0
 
 
 BACKGROUND_SPEED_NORMAL = 1.0
@@ -94,14 +119,6 @@ WHITE = (255, 255, 255)
 WHITE_2 = (238, 238, 238)
 WHITE_3 = (210, 210, 210)
 BLACK = (0, 0, 0)
-
-
-# enumerate the projectile types
-class ProjectileType:
-    Circle = 1
-    Meatball = 2
-    Noodle = 3
-    PlayerTorpedo = 4
 
 
 # enumerate the trash mob types
@@ -597,10 +614,7 @@ def handle_game_events():
             if event.key == pygame.K_v:
                 change_volume()
             if event.key == pygame.K_f:
-                if fps == 60:
-                    fps = 120
-                else:
-                    fps = 60
+                fps = 60 if fps == 120 else 120
 
 
 # set to none if you do not wish to constrain
@@ -1008,6 +1022,7 @@ def projectile_hits_ship(projectile, ship):
 
 
 def collide():
+    global damage_done
     for projectile in player_projectiles:
         # check if the projectile x y is within the boss x y + w h
         #        if(projectile.x > boss.x and projectile.x < boss.x + boss.w * boss.scale and projectile.y > boss.y and projectile.y < boss.y + boss.h * boss.scale):
@@ -1016,6 +1031,8 @@ def collide():
                 # play the player hit sound
                 pygame.mixer.Sound.play(sfx['player_hit'])
                 boss.hp -= projectile.damage
+                # record the damage done
+                damage_done += projectile.damage
                 # player_projectiles.remove(projectile)
                 projectile.hit = True
                 boss.frame_last_hit = frame_counter
@@ -1113,7 +1130,7 @@ def update_game():
         frame_last_dodge = -500
         player.hp = 0
         player.deaths += 1
-        game_state = "game_over"
+        game_state = GameState.GameOver
         # boss_projectiles = []
         player_projectiles = []
         trash_mobs = []
@@ -1123,7 +1140,7 @@ def update_game():
         # play the boss death sound
         pygame.mixer.Sound.play(sfx['level_up'])
         trash_mobs = []
-        game_state = "victory"
+        game_state = GameState.Victory
         # clear active projectiles from the board
         boss_projectiles = []
         # player_projectiles = []
@@ -1226,7 +1243,8 @@ def draw_score_line():
         screen.blit(text_shield_level, (text_score_line.get_width() + 10, 680))
 
     text_status_line = font_tiny.render(
-        "Volume: " + str(volume) + "%" +
+        "DPS: " + str(dps) +
+        "  Volume: " + str(volume) + "%" +
         "  FPS (Target): " + str(round(clock.get_fps())) +
         " (" + str(fps) + ")",
         True,
@@ -1304,11 +1322,11 @@ def run_title_screen():
             joy_shoot = True
 
     if keys[pygame.K_SPACE] or joy_shoot:
-        game_state = "start_level"
+        game_state = GameState.StartLevel
 
     # check for a key press of escape
     if keys[pygame.K_ESCAPE]:
-        game_state = "quit"
+        game_state = GameState.Quit
 
     # update the screen
     pygame.display.flip()
@@ -1318,6 +1336,52 @@ def draw_heading():
     screen.blit(text_title_heading,
                 (width / 2 - text_title_heading.get_width()/2,
                  50))
+
+def run_ending_screen():
+    # draw a starry background
+    screen.fill(BLACK)
+    move_starfield()
+    draw_starfield()
+
+    CONGRATULATIONS = "CONGRATULATIONS!!!"
+    text_congratulations = font_large.render(CONGRATULATIONS, True, (255, 255, 255))
+    screen.blit(text_congratulations, (width / 2 - text_congratulations.get_width()/2, 50))
+
+    ending_dialog =[
+        "As Captain Jack lands the final blow on Roy Carnassus, the tyrant's",
+        "body crumbles into a cloud of cosmic dust. The galaxy is saved, and",
+        "the universe is at peace. Captain Jack is hailed as a hero, and the",
+        "galaxy rejoices in a new era of peace and prosperity.",
+        "",
+        "\"Captain Jack, Savior of the Galaxy! In the face of insurmountable",
+        "odds, you have vanquished the malevolent Roy Carnassus, restoring",
+        "hope and prosperity to the cosmos. The stars themselves bear witness",
+        "to your valor, and your tale shall be etched in the annals of time.",
+        "Now, prepare to embark on your next adventure, for the universe is",
+        "yours to explore!\"",
+        "",
+        "Deaths: " + str(player.deaths),
+        "Weapons: " + str(player.weapon_level),
+        "Defense: " + str(player.defense_level + 1),
+        "",
+        "[escape] TO QUIT"
+
+    ]
+
+    for i in range(len(ending_dialog)):
+        text = font_small.render(ending_dialog[i], True, (255, 255, 255))
+        screen.blit(text, (width / 2 - text.get_width()/2, 150 + i * 30))
+
+
+    # update the screen
+    pygame.display.flip()
+
+    # save the display to a file in my pictures
+    if state_current_frame() == 0:
+        # name the file with the current date and time
+        now = datetime.datetime.now()
+        filename = "THFRC-" + now.strftime("%Y-%m-%d_%H-%M-%S") + ".png"
+        pygame.image.save(screen, os.path.expanduser("~/" + filename))
 
 
 def run_victory_screen():
@@ -1378,8 +1442,11 @@ def run_victory_screen():
 
     # end the animation and go to the level up screen
     if state_current_frame() >= 300 * fps_scaler():
-        game_state = "level_up"
-        load_boss()
+        if boss.name == "Roy Carnassus":
+            game_state = GameState.Ending
+        else:
+            game_state = GameState.LevelUp
+            load_boss()
 
     # draw the player
     player.draw()
@@ -1568,11 +1635,11 @@ def run_game_over_screen():
         boss.x = boss_start_position()
         boss.y = height / 2 - boss.h * boss.scale / 2
         boss_projectiles = []
-        game_state = "game"
+        game_state = GameState.Game
 
     # check for a key press of escape
     if keys[pygame.K_ESCAPE]:
-        game_state = "quit"
+        game_state = GameState.Quit
 
     draw_score_line()
 
@@ -1642,11 +1709,11 @@ def run_level_up_screen():
         boss.vx = 0
         boss.vy = 0
 
-        game_state = "start_level"
+        game_state = GameState.StartLevel
 
     # check for a key press of escape
     if keys[pygame.K_ESCAPE]:
-        game_state = "quit"
+        game_state = GameState.Quit
 
     draw_score_line()
 
@@ -1694,7 +1761,7 @@ def run_start_level_screen():
                     boss_name_text.get_width()/2, 150))
 
     if background_speed == 1.0 and player.x == 100 and boss.x == boss_start_position():
-        game_state = "game"
+        game_state = GameState.Game
 
     draw_score_line()
 
@@ -1705,6 +1772,8 @@ def run_start_level_screen():
 def state_current_frame():
     return frame_counter - state_start_frame
 
+def state_current_time():
+    return time.time() - state_start_time
 
 def set_volume(level: int = 100):
     global volume
@@ -1868,7 +1937,7 @@ space_objects.append(SpaceObject('planet20'))
 meatball = load_image("sprites/jwd-meatball.png")
 noodle = load_image("ships/macaroni.png", scale=0.03)
 controls = load_image("sprites/jwd-move.png")
-player_torpedo = load_image("sprites/kenney-player-torpedo.png")
+player_torpedo = load_image("sprites/kenney-player-torpedo.png", scale=0.75)
 
 
 # boss.flip_h()
@@ -1898,40 +1967,45 @@ while not done:
     handle_jukebox()
 
     # check the game state and perform the appropriate actions
-    if game_state == "title":
-        run_title_screen()
-
-    elif game_state == "game":
-        update_game()
-        draw_screen()
-
-    elif game_state == "victory":
-        run_victory_screen()
-
-    elif game_state == "level_up":
-        run_level_up_screen()
-
-    elif game_state == "game_over":
-        run_game_over_screen()
-
-    elif game_state == "start_level":
-        run_start_level_screen()
-
-    elif game_state == "quit":
-        done = True
+    match game_state:
+        case GameState.Title:
+            run_title_screen()
+        case GameState.Game:
+            update_game()
+            draw_screen()
+        case GameState.Victory:
+            run_victory_screen()
+        case GameState.LevelUp:
+            run_level_up_screen()
+        case GameState.GameOver:
+            run_game_over_screen()
+        case GameState.StartLevel:
+            run_start_level_screen()
+        case GameState.Quit:
+            done = True
+        case GameState.Ending:
+            run_ending_screen()
 
     # increment the frame counter
     frame_counter += 1
 
-    # if the game state changes record the frame counter
+    # if the game state changes record the frame and timing counter
     if game_state != last_game_state:
+        print("State Change: " + str(last_game_state) + " -> " +str(game_state) +
+              ", State Duration: " + str(state_current_time()))
+
         last_game_state = game_state
         state_start_frame = frame_counter
+        state_start_time = time.time()
 
     # console the frame rate
-    if(frame_counter % 60 == 0):
-        print("Frame rate: " + str(round(clock.get_fps())) +
-              ", Game State: " + game_state)
+    if(frame_counter % fps == 0):
+        dps = damage_done - last_damage_done
+        last_damage_done = damage_done
+        print("Frame Rate: " + str(round(clock.get_fps())) +
+              ", Game State: " + str(game_state) + ", State Time: " +
+              str(time.time() - state_start_time) + ", DPS: " + str(dps)
+              )
 
     # limit to 60 frames per second
     clock.tick(fps)
