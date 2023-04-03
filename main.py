@@ -699,7 +699,10 @@ def handle_game_inputs():
 def process_upgrade(upgrade_type: UpgradeType):
     global attack_power, cooldown_dodge, cooldown_attack, player, upgrade_path
 
-    upgrade_path.append(upgrade_type)
+    print(upgrade_type)
+    card_upgrade = upgrades[upgrade_type-1]
+
+    upgrade_path.append(card_upgrade['name'])
 
     match upgrade_type:
         case UpgradeType.AttackDamage:
@@ -1293,10 +1296,13 @@ def draw_screen():
 
 def draw_score_line():
     # draw the score line
+
     text_score_line = font_small.render(
         "Deaths: " + str(player.deaths) +
         # "Level: " + str(player.level) +
-        "  Weapons: " + str(player.weapon_level) +
+        "  Power: " + str(attack_power) +
+
+        "  Speed: " + "{0:.3f}".format(cooldown_attack) +
         "  Defense: " + str(player.defense_level + 1) +
         "  HP: " + str(constrain(player.hp, -player.hp,
                                  player.max_hp)) + "/" + str(player.max_hp),
@@ -1420,18 +1426,22 @@ def run_ending_screen():
     screen.blit(text_congratulations, (width / 2 - text_congratulations.get_width()/2, 50))
 
 
-    build_path = "Upgrades: "
+    build_path_raw = "Upgrades : " + " > ".join(upgrade_path)
+
+    # split build path into lines of 60 characters
+    build_path_1 = ""
     build_path_2 = ""
     build_path_3 = ""
-    build_step = 0
-    for upgrade_taken in upgrade_path:
-        build_step += 1
-        if build_step < 5:
-            build_path += " >" + upgrades[upgrade_taken]['name']
-        if build_step < 10:
-            build_path_2 += " >" + upgrades[upgrade_taken]['name']
-        if build_step < 15:
-            build_path_3 += " >" + upgrades[upgrade_taken]['name']
+    build_path_4 = ""
+
+    build_path_1 = build_path_raw[:60]
+    if len(build_path_raw) > 60:
+        build_path_2 = build_path_raw[60:120]
+    if len(build_path_raw) > 120:
+        build_path_3 = build_path_raw[120:180]
+    if len(build_path_raw) > 180:
+        build_path_4 = build_path_raw[180:240]
+
 
     ending_dialog = [
         "As Captain Jack lands the final blow on Roy Carnassus, the tyrant's",
@@ -1450,9 +1460,10 @@ def run_ending_screen():
         # "Weapons: " + str(player.weapon_level),
         # "Defense: " + str(player.defense_level + 1),
         # "",
-        build_path,
+        build_path_1,
         build_path_2,
         build_path_3,
+        build_path_4,
         "",
         "[escape] TO QUIT"
     ]
@@ -1461,7 +1472,7 @@ def run_ending_screen():
 
     for i in range(len(ending_dialog)):
         text = font_small.render(ending_dialog[i], True, (255, 255, 255))
-        screen.blit(text, (width / 2 - text.get_width()/2, 150 + i * 30))
+        screen.blit(text, (width / 2 - text.get_width()/2, 150 + i * 25))
 
 
     # update the screen
@@ -1762,12 +1773,6 @@ def run_level_up_screen():
     screen.blit(text_level_up, (width / 2 - text_level_up.get_width() / 2, 25))
     screen.blit(text_level_select_an_upgrade, (width / 2 - text_level_up.get_width() / 2, 75))
 
-    # draw 4 boxes for the player to choose upgrades from
-    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100, 400, 200), 2)
-    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 100, 400, 200), 2)
-    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 200, 400, 200), 2)
-    # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 300, 400, 200), 2)
-
     card_spacing = int(width / 5)
     card_width = 250
     card_height = 200
@@ -1779,20 +1784,9 @@ def run_level_up_screen():
         card_info_2 = card_upgrade['info_2']
         card_info_3 = card_upgrade['info_3']
         color = card_upgrade['color']
-
         card_top = 128
         card_center = card_spacing * (i + 1)
         card_left = card_spacing * (i + 1) - card_width / 2
-        # color = GREEN
-        # match i:
-        #     case 0:
-        #         color = YELLOW
-        #     case 1:
-        #         color = GREEN
-        #     case 2:
-        #         color = RED
-        #     case 3:
-        #         color = BLUE
 
         # draw the card border
         pygame.draw.rect(screen, color, (card_left, card_top, card_width, card_height), 3, 10)
@@ -1810,47 +1804,18 @@ def run_level_up_screen():
 
         # draw the card text based on the upgrade_offers
         # and their text data in the upgrades dictionary
-        # print()
-
-
-        # print(['name'])
-        # print(upgrades[upgrade_offers[i]-1].name)
         text_card_title = font_small.render(card_name, True, color)
         text_card_info_1 = font_tiny.render(card_info_1, True, color)
         text_card_info_2 = font_tiny.render(card_info_2, True, color)
         text_card_info_3 = font_tiny.render(card_info_3, True, color)
-
         screen.blit(text_card_title, (card_center - text_card_title.get_width() / 2, top_line_y + 10))
         screen.blit(text_card_info_1, (card_center - text_card_info_1.get_width() / 2, top_line_y + 50))
         screen.blit(text_card_info_2, (card_center - text_card_info_2.get_width() / 2, top_line_y + 75))
         screen.blit(text_card_info_3, (card_center - text_card_info_3.get_width() / 2, top_line_y + 100))
 
-    # screen.blit(text_level_weapon, (width / 2 - text_level_weapon.get_width() / 2, 550))
-    # screen.blit(text_level_armor, (width / 2 - text_level_armor.get_width() / 2, 600))
-
-    # it will be technically possible to get a frame perfect double level up
-
     # check for enter key to level up weapon
     keys = pygame.key.get_pressed()
 
-    # check for joystick input
-    joy_weapon_upgrade = False
-    joy_defense_upgrade = False
-    if joystick is not None:
-        if joystick.get_button(0):
-            joy_defense_upgrade = True
-        if joystick.get_button(3):
-            joy_weapon_upgrade = True
-
-    # if keys[pygame.K_RETURN] or joy_weapon_upgrade:
-    #     # player.weapon_level += 1
-    #     player.add_weapon(ProjectileType.ForwardTorpedo)
-
-    # # check for tab key to level up defense
-    # if keys[pygame.K_TAB] or joy_defense_upgrade:
-    #     player.defense_level += 1
-    #     player.max_hp += 5
-    #     player.hp = player.max_hp
 
 
     proceed = False
@@ -1866,13 +1831,22 @@ def run_level_up_screen():
     elif keys[pygame.K_4]:
         proceed = True
         process_upgrade(upgrade_offers[3])
+    elif keys[pygame.K_q]:
+        # cheat code 'q' to level up all upgrades
+        process_upgrade(upgrade_offers[0])
+        process_upgrade(upgrade_offers[1])
+        process_upgrade(upgrade_offers[2])
+        process_upgrade(upgrade_offers[3])
+        proceed = True
+    elif keys[pygame.K_9]:
+        # cheat code '9' to level up all upgrades
+        process_upgrade(upgrade_offers[0])
+        process_upgrade(upgrade_offers[1])
+        process_upgrade(upgrade_offers[2])
+        process_upgrade(upgrade_offers[3])
+        game_state = GameState.Ending
 
-    # check for the q key to boost both without the frame perfect double level up
-    if keys[pygame.K_q]:
-        player.weapon_level += 1
-        player.defense_level += 1
-        player.max_hp += 5
-        player.hp = player.max_hp
+
 
     # check for a key press of either enter or tab to start the next level
     if proceed:
