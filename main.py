@@ -37,6 +37,22 @@ import time
 import datetime
 import os
 
+# let's define some colors
+
+YELLOW = (255, 255, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+PURPLE = (255, 0, 255)
+GREEN = (0, 255, 0)
+ORANGE = (255, 165, 0)
+CYAN = (0, 255, 255)
+BROWN = (139, 69, 19)
+WHITE = (255, 255, 255)
+WHITE_2 = (238, 238, 238)
+WHITE_3 = (210, 210, 210)
+BLACK = (0, 0, 0)
+
+
 
 # class for boss configuration
 class Boss:
@@ -45,13 +61,25 @@ class Boss:
         self.hp = hp
         self.sprite = sprite
 
+class UpgradeType:
+    AttackSpeed = 1
+    AttackDamage = 2
+    ForwardTorpedo = 3
+    HomingTorpedo = 4
+    WildTorpedo = 5
+    MaxHealth = 6
+    DodgeCooldown = 7
+    ArmorUp = 8
 
 # enumerate the projectile types
 class ProjectileType:
     Circle = 1
     Meatball = 2
     Noodle = 3
-    PlayerTorpedo = 4
+    ForwardTorpedo = 4
+    Homing = 5
+    Wild = 6
+    Spread = 7
 
 # enumerate the game states
 class GameState:
@@ -64,25 +92,31 @@ class GameState:
     Quit = 7
     Ending = 8
 
-width = 1280
-height = 660
-ship_speed = 9
+
+attack_power = 5
 background_speed = 1.0
+base_fps = 60
+cooldown_attack = 0.1
+cooldown_dodge = 2.5
+damage_done = 0
+dps = 0
+dt = 1.0
+fps = 60
 frame_counter = 0
 frame_last_shot = 0
-frame_last_dodge = 0
-game_state = GameState.Title
-last_game_state = game_state
+game_state = last_game_state = GameState.Title
+height = 660
+last_damage_done = 0
+ship_speed = 9
+starfield_size = 300
 state_start_frame = 0
 state_start_time = time.time()
-starfield_size = 300
+time_last_dodge = 0
+time_last_attack = 0
 volume: int = 10
-cool_down_dodge = 60 * 2.5
-fps = 60
-base_fps = 60
-damage_done = 0
-last_damage_done = 0
-dps = 0
+width = 1280
+upgrade_offers = []
+upgrade_path = []
 
 
 BACKGROUND_SPEED_NORMAL = 1.0
@@ -116,47 +150,66 @@ trash_mobs = []
 
 upgrades = [
     {
+        'name': 'Attack Speed',
+        'info_1': 'Increases your attack',
+        'info_2': 'speed allowing you to',
+        'info_3': 'shoot more rapidly.',
+        'color': ORANGE
+    },
+    {
         'name': 'Attack Up',
         'info_1': 'Increases your attack',
-        'info_2': 'power making your ship',
+        'info_2': 'power making each shot',
         'info_3': 'deal more damage.',
+        'color': ORANGE
     },
     {
-        'name': 'Forward Canon',
+        'name': 'Forward Torpedo',
         'info_1': 'Fire an additional',
-        'info_2': 'forward canon.',
+        'info_2': 'forward torpedo.',
         'info_3': '100 Potency',
+        'color': RED
     },
     {
-        'name': 'Aimed Shot',
-        'info_1': 'Add a high accuracy',
-        'info_2': 'but low potency.',
+        'name': 'Homing Torpedo',
+        'info_1': 'Fire a high accuracy',
+        'info_2': 'but low potency torpedo.',
         'info_3': '40 Potency',
+        'color': RED
+
 
     },
     {
-        'name': 'Wild Shot Canon',
+        'name': 'Wild Shot',
         'info_1': 'An unpredictable but',
         'info_2': 'powerful attack.',
         'info_3': '160 Potency',
+        'color': RED
+
     },
+    {
+        'name': 'Max Health',
+        'info_1': 'Increases your maximum',
+        'info_2': 'health allowing you to',
+        'info_3': 'take more damage.',
+        'color': GREEN
+    },
+    {
+        'name': 'Dodge Cooldown',
+        'info_1': 'Decreases the cooldown',
+        'info_2': 'between dodges allowing',
+        'info_3': 'you to dodge more often.',
+        'color': GREEN
+    },
+    {
+        'name': 'Armor Up',
+        'info_1': 'Increases your armor',
+        'info_2': 'causing you to take',
+        'info_3': 'less damage.',
+        'color': GREEN
+    }
+
 ]
-
-# classes
-
-YELLOW = (255, 255, 0)
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
-PURPLE = (255, 0, 255)
-GREEN = (0, 255, 0)
-ORANGE = (255, 165, 0)
-CYAN = (0, 255, 255)
-BROWN = (139, 69, 19)
-WHITE = (255, 255, 255)
-WHITE_2 = (238, 238, 238)
-WHITE_3 = (210, 210, 210)
-BLACK = (0, 0, 0)
-
 
 # enumerate the trash mob types
 MOB_TYPE_BOSS = -1
@@ -219,8 +272,8 @@ class SpaceObject:
         self.y = random.randint(-20, 600)
 
     def move(self):
-        self.x += self.vx * background_speed * fps_divisor()
-        self.y += self.vy * background_speed * fps_divisor()
+        self.x += self.vx * background_speed * dt
+        self.y += self.vy * background_speed * dt
 
         if self.x < -width:
             self.resize()
@@ -354,6 +407,7 @@ class Ship:
         self.base_y = None
         self.sinusoid_speed = 200
         self.frame_last_hit = 0
+        self.weapons = []
 
         # create the alpha transparency mask for the ship
         self.sprite_damaged = reddening(self.sprite)
@@ -442,6 +496,9 @@ class Ship:
         else:
             return False
 
+    def add_weapon(self, weapon: ProjectileType):
+        self.weapons.append(weapon)
+
 # load a part of an image from a file to be used as a sprite frame
 
 
@@ -510,7 +567,7 @@ class Projectile:
                             self.y - noodle.get_height() / 2),
                             frame_counter % 360
                         )
-                    case ProjectileType.PlayerTorpedo:
+                    case ProjectileType.ForwardTorpedo:
                         angle = 180 if self.vx < 0 else 0 # if shot left, rotate 180 else 0
                         self.blitRotateCenter(
                             player_torpedo,
@@ -586,7 +643,7 @@ def move_projectiles():
 
 
 def handle_game_inputs():
-    global player, frame_last_shot, frame_last_dodge
+    global player, time_last_dodge, time_last_attack
 
     # reset ship motion
     player.vx = 0
@@ -627,16 +684,47 @@ def handle_game_inputs():
     if keys[pygame.K_DOWN] or keys[pygame.K_s] or joy_down:
         player.vy += ship_speed
     if keys[pygame.K_TAB] or joy_dodge:
-        if frame_counter - frame_last_dodge > cool_down_dodge * fps_scaler():
-            frame_last_dodge = frame_counter
+        if time.time() - time_last_dodge > cooldown_dodge:
+            time_last_dodge = time.time()
             if player.vx == 0 and player.vy == 0:
                 player.vx += ship_speed
-            player.vx *= 25 * fps_scaler()
-            player.vy *= 25 * fps_scaler()
+            player.vx *= 25 * dt
+            player.vy *= 25 * dt
+
     if keys[pygame.K_SPACE] or joy_shoot:
-        if(frame_counter - frame_last_shot > 5 * fps_scaler()):
+        if time.time() - time_last_attack > cooldown_attack:
+            time_last_attack = time.time()
             player_shoot()
-            frame_last_shot = frame_counter
+
+def process_upgrade(upgrade_type: UpgradeType):
+    global attack_power, cooldown_dodge, cooldown_attack, player, upgrade_path
+
+    upgrade_path.append(upgrade_type)
+
+    match upgrade_type:
+        case UpgradeType.AttackDamage:
+            attack_power += 5
+        case UpgradeType.MaxHealth:
+            player.max_hp = int(player.max_hp * 1.66667)
+            player.hp = player.max_hp
+        case UpgradeType.DodgeCooldown:
+            cooldown_dodge -= 0.1
+        case UpgradeType.AttackSpeed:
+            cooldown_attack *= 0.9
+        case UpgradeType.ForwardTorpedo:
+            player.add_weapon(ProjectileType.ForwardTorpedo)
+        case UpgradeType.WildTorpedo:
+            player.add_weapon(ProjectileType.Wild)
+        case UpgradeType.HomingTorpedo:
+            player.add_weapon(ProjectileType.Homing)
+        case UpgradeType.ArmorUp:
+            player.defense_level += 1
+        case _:
+            pass
+
+
+
+
 
 
 def handle_game_events():
@@ -733,114 +821,59 @@ def boss_summon(mob_type=1):
 def player_shoot():
     global player_projectiles
 
-    # perform basic attack
-    player_projectiles.append(
-        fire_projectile(
-            player,
-            boss,
-            1,
-            player.weapon_level*3,
-            WHITE,
-            6,
-            20,
-            projectile_type=ProjectileType.PlayerTorpedo
-        )
-    )
+    fox = 0
+    foy = 0
 
-    # player level 2 weapon: quadrant attack
-    if player.weapon_level >= 2:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                2,
-                player.weapon_level*2,
-                CYAN,
-                6,
-                20
-            )
-        )
+    for weapon in player.weapons:
+        match weapon:
+            case ProjectileType.Homing:
+                player_projectiles.append(
+                    fire_projectile(
+                        player,
+                        boss,
+                        3,
+                        int(attack_power * .4),
+                        BLUE,
+                        6,
+                        20
+                    )
+                )
+            case ProjectileType.Wild:
+                player_projectiles.append(
+                    fire_projectile(
+                        player,
+                        boss,
+                        2,
+                        int(attack_power * 1.6),
+                        CYAN,
+                        6,
+                        20
+                    )
+                )
+            case ProjectileType.ForwardTorpedo:
+                player_projectiles.append(
+                    fire_projectile(
+                        player,
+                        boss,
+                        1,
+                        attack_power,
+                        WHITE,
+                        6,
+                        20,
+                        projectile_type=ProjectileType.ForwardTorpedo,
+                        ox = fox,
+                        oy = foy
+                    )
+                )
 
-    # player level 3 weapon: targeted attack
-    if player.weapon_level >= 3:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                3,
-                player.weapon_level,
-                BLUE,
-                6,
-                20
-            )
-        )
-
-    # player level 4 weapon: second forward attack
-    if player.weapon_level >= 4:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                1,
-                player.weapon_level*2,
-                WHITE_2,
-                6,
-                20,
-                ox=-5,
-                oy=-15,
-                projectile_type=ProjectileType.PlayerTorpedo
-            )
-        )
-
-    # player level 5 weapon: third forward attack
-    if player.weapon_level >= 5:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                1,
-                player.weapon_level*2,
-                WHITE_2,
-                6,
-                20,
-                ox=-5,
-                oy=15,
-                projectile_type=ProjectileType.PlayerTorpedo
-            )
-        )
-
-    # player level 6 weapon: second quadrant attack
-    if player.weapon_level >= 6:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                2,
-                player.weapon_level,
-                CYAN,
-                6,
-                20,
-                ox=-5,
-                oy=-15
-            )
-        )
-
-    # player level 7 weapon: third quadrant attack
-    if player.weapon_level >= 7:
-        player_projectiles.append(
-            fire_projectile(
-                player,
-                boss,
-                2,
-                player.weapon_level,
-                CYAN,
-                6,
-                20,
-                ox=-5,
-                oy=15
-            )
-        )
-
+                if foy == 0:
+                    fox -= -5
+                    foy = -15
+                elif foy == -15:
+                    foy = 15
+                else:
+                    fox += 32
+                    foy = 0
 
 def fire_projectile(
     source,
@@ -1034,7 +1067,7 @@ def projectile_hits_ship(projectile, ship):
     # if it appears the projectile is inside the box perform a collision against the mask
     if distance <= projectile_r:
 
-        if projectile.type == ProjectileType.Circle or projectile.damage < 0 or projectile.type == ProjectileType.PlayerTorpedo:
+        if projectile.type == ProjectileType.Circle or projectile.damage < 0 or projectile.type == ProjectileType.ForwardTorpedo:
             # if the projectile is a circle, perform a circle collision
             # against the mask of a circle. begin by drawing the bullet
             # collision mask
@@ -1110,7 +1143,7 @@ def collide():
 
 
 def update_game():
-    global game_state, boss_projectiles, player_projectiles, trash_mobs, frame_last_dodge
+    global game_state, boss_projectiles, player_projectiles, trash_mobs
     # move the stars
     move_starfield()
 
@@ -1164,7 +1197,7 @@ def update_game():
     if player.hp <= 0:
         # play the player death sound
         pygame.mixer.Sound.play(sfx['player_death'])
-        frame_last_dodge = -500
+
         player.hp = 0
         player.deaths += 1
         game_state = GameState.GameOver
@@ -1222,18 +1255,16 @@ def draw_screen():
     for trash_mob in trash_mobs:
         draw_hp_bar(BLUE, trash_mob)
 
-    # draw the dodge cool down above the player
-    if frame_counter - frame_last_dodge < cool_down_dodge * fps_scaler():
-
+    # draw the dodge cool down above the player if dodge is on cooldown
+    dodge_ready = (time.time() - time_last_dodge) / cooldown_dodge
+    if dodge_ready < 1:
         pygame.draw.rect(
             screen,
             PURPLE,
             (
                 player.x,
                 player.y + player.h * player.scale + 11,
-                (player.w * player.scale) *
-                ((cool_down_dodge * fps_scaler() - (frame_counter -
-                 frame_last_dodge)) / cool_down_dodge * fps_scaler()),
+                (player.w * player.scale) * dodge_ready,
                 2
             )
         )
@@ -1388,6 +1419,20 @@ def run_ending_screen():
     text_congratulations = font_large.render(CONGRATULATIONS, True, (255, 255, 255))
     screen.blit(text_congratulations, (width / 2 - text_congratulations.get_width()/2, 50))
 
+
+    build_path = "Upgrades: "
+    build_path_2 = ""
+    build_path_3 = ""
+    build_step = 0
+    for upgrade_taken in upgrade_path:
+        build_step += 1
+        if build_step < 5:
+            build_path += " >" + upgrades[upgrade_taken]['name']
+        if build_step < 10:
+            build_path_2 += " >" + upgrades[upgrade_taken]['name']
+        if build_step < 15:
+            build_path_3 += " >" + upgrades[upgrade_taken]['name']
+
     ending_dialog = [
         "As Captain Jack lands the final blow on Roy Carnassus, the tyrant's",
         "body crumbles into a cloud of cosmic dust. The galaxy is saved, and",
@@ -1402,11 +1447,17 @@ def run_ending_screen():
         "yours to explore!\"",
         "",
         "Deaths: " + str(player.deaths),
-        "Weapons: " + str(player.weapon_level),
-        "Defense: " + str(player.defense_level + 1),
+        # "Weapons: " + str(player.weapon_level),
+        # "Defense: " + str(player.defense_level + 1),
+        # "",
+        build_path,
+        build_path_2,
+        build_path_3,
         "",
         "[escape] TO QUIT"
     ]
+
+
 
     for i in range(len(ending_dialog)):
         text = font_small.render(ending_dialog[i], True, (255, 255, 255))
@@ -1425,7 +1476,7 @@ def run_ending_screen():
 
 
 def run_victory_screen():
-    global game_state, background_speed, player_projectiles
+    global game_state, background_speed, player_projectiles, upgrade_offers
 
     # draw a starry background
     screen.fill(BLACK)
@@ -1462,10 +1513,11 @@ def run_victory_screen():
             3 + (state_current_frame() - 150) / 8
         )
 
-    if state_current_frame() < 270 * fps_scaler():
+    # if state_current_frame() < 270 * fps_scaler():
+    if state_current_time() < 4.5:
         player.move()
 
-    if state_current_frame() > 270 * fps_scaler():
+    if state_current_time() >= 4.5:
         player.x = width * 3
         background_speed = BACKGROUND_SPEED_WARP
         # draw a white box where the player left off from across the screen
@@ -1481,11 +1533,22 @@ def run_victory_screen():
         )
 
     # end the animation and go to the level up screen
-    if state_current_frame() >= 300 * fps_scaler():
+    if state_current_time() >= 5:
         if boss.name == "Roy Carnassus":
             game_state = GameState.Ending
         else:
             game_state = GameState.LevelUp
+            upgrade_offers = [
+                UpgradeType.AttackSpeed,
+                UpgradeType.AttackDamage,
+                UpgradeType.ForwardTorpedo,
+                UpgradeType.HomingTorpedo,
+                UpgradeType.WildTorpedo,
+                UpgradeType.MaxHealth,
+                UpgradeType.DodgeCooldown,
+                UpgradeType.ArmorUp
+            ]
+            random.shuffle(upgrade_offers)
             load_boss()
 
     # draw the player
@@ -1706,23 +1769,30 @@ def run_level_up_screen():
     # pygame.draw.rect(screen, WHITE, (width / 2 - 200, height / 2 - 100 + 300, 400, 200), 2)
 
     card_spacing = int(width / 5)
-    card_width = 200
-    card_height = 400
+    card_width = 250
+    card_height = 200
 
     for i in range(4):
+        card_upgrade = upgrades[upgrade_offers[i] - 1]
+        card_name = card_upgrade['name']
+        card_info_1 = card_upgrade['info_1']
+        card_info_2 = card_upgrade['info_2']
+        card_info_3 = card_upgrade['info_3']
+        color = card_upgrade['color']
+
         card_top = 128
         card_center = card_spacing * (i + 1)
         card_left = card_spacing * (i + 1) - card_width / 2
-        color = GREEN
-        match i:
-            case 0:
-                color = YELLOW
-            case 1:
-                color = GREEN
-            case 2:
-                color = RED
-            case 3:
-                color = BLUE
+        # color = GREEN
+        # match i:
+        #     case 0:
+        #         color = YELLOW
+        #     case 1:
+        #         color = GREEN
+        #     case 2:
+        #         color = RED
+        #     case 3:
+        #         color = BLUE
 
         # draw the card border
         pygame.draw.rect(screen, color, (card_left, card_top, card_width, card_height), 3, 10)
@@ -1738,15 +1808,25 @@ def run_level_up_screen():
         pygame.draw.line(screen, color, (card_left, top_line_y), (card_left + card_width - 1, top_line_y), 3)
         pygame.draw.line(screen, color, (card_left, bottom_line_y), (card_left + card_width - 1, bottom_line_y), 3)
 
+        # draw the card text based on the upgrade_offers
+        # and their text data in the upgrades dictionary
+        # print()
 
 
-    # pygame.draw.rect(screen, GREEN, (100, 100, 225, 400), 3, 10)
-    # pygame.draw.rect(screen, RED, (400, 100, 225, 400), 3, 10)
-    # pygame.draw.rect(screen, GREEN, (400, 100, 225, 400), 3, 10)
-    # pygame.draw.rect(screen, GREEN, (400, 100, 225, 400), 3, 10)
+        # print(['name'])
+        # print(upgrades[upgrade_offers[i]-1].name)
+        text_card_title = font_small.render(card_name, True, color)
+        text_card_info_1 = font_tiny.render(card_info_1, True, color)
+        text_card_info_2 = font_tiny.render(card_info_2, True, color)
+        text_card_info_3 = font_tiny.render(card_info_3, True, color)
 
-    screen.blit(text_level_weapon, (width / 2 - text_level_weapon.get_width() / 2, 550))
-    screen.blit(text_level_armor, (width / 2 - text_level_armor.get_width() / 2, 600))
+        screen.blit(text_card_title, (card_center - text_card_title.get_width() / 2, top_line_y + 10))
+        screen.blit(text_card_info_1, (card_center - text_card_info_1.get_width() / 2, top_line_y + 50))
+        screen.blit(text_card_info_2, (card_center - text_card_info_2.get_width() / 2, top_line_y + 75))
+        screen.blit(text_card_info_3, (card_center - text_card_info_3.get_width() / 2, top_line_y + 100))
+
+    # screen.blit(text_level_weapon, (width / 2 - text_level_weapon.get_width() / 2, 550))
+    # screen.blit(text_level_armor, (width / 2 - text_level_armor.get_width() / 2, 600))
 
     # it will be technically possible to get a frame perfect double level up
 
@@ -1762,14 +1842,30 @@ def run_level_up_screen():
         if joystick.get_button(3):
             joy_weapon_upgrade = True
 
-    if keys[pygame.K_RETURN] or joy_weapon_upgrade:
-        player.weapon_level += 1
+    # if keys[pygame.K_RETURN] or joy_weapon_upgrade:
+    #     # player.weapon_level += 1
+    #     player.add_weapon(ProjectileType.ForwardTorpedo)
 
-    # check for tab key to level up defense
-    if keys[pygame.K_TAB] or joy_defense_upgrade:
-        player.defense_level += 1
-        player.max_hp += 5
-        player.hp = player.max_hp
+    # # check for tab key to level up defense
+    # if keys[pygame.K_TAB] or joy_defense_upgrade:
+    #     player.defense_level += 1
+    #     player.max_hp += 5
+    #     player.hp = player.max_hp
+
+
+    proceed = False
+    if keys[pygame.K_1]:
+        proceed = True
+        process_upgrade(upgrade_offers[0])
+    elif keys[pygame.K_2]:
+        proceed = True
+        process_upgrade(upgrade_offers[1])
+    elif keys[pygame.K_3]:
+        proceed = True
+        process_upgrade(upgrade_offers[2])
+    elif keys[pygame.K_4]:
+        proceed = True
+        process_upgrade(upgrade_offers[3])
 
     # check for the q key to boost both without the frame perfect double level up
     if keys[pygame.K_q]:
@@ -1779,8 +1875,7 @@ def run_level_up_screen():
         player.hp = player.max_hp
 
     # check for a key press of either enter or tab to start the next level
-    if keys[pygame.K_RETURN] or keys[pygame.K_TAB] or joy_weapon_upgrade or joy_defense_upgrade:
-
+    if proceed:
         player.x = width * 1.5
         player.y = height / 2 - player.h * player.scale / 2
 
@@ -1984,9 +2079,7 @@ player.hp = player.max_hp
 player.x = 100
 player.deaths = 0
 player.score = 0
-
-frame_last_dodge = -cool_down_dodge
-
+player.add_weapon(ProjectileType.ForwardTorpedo)
 
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)
 boss.type = MOB_TYPE_BOSS
@@ -2088,11 +2181,12 @@ while not done:
         last_damage_done = damage_done
         print("Frame Rate: " + str(round(clock.get_fps())) +
               ", Game State: " + str(game_state) + ", State Time: " +
-              str(time.time() - state_start_time) + ", DPS: " + str(dps)
+              str(time.time() - state_start_time) + ", DPS: " + str(dps) +
+              ", Last dt: " + str(dt)
               )
 
     # limit to 60 frames per second
-    clock.tick(fps)
+    dt = clock.tick(fps) / 1000
 
 # quit pygame and clean up
 pygame.quit()

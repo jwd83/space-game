@@ -4,10 +4,10 @@ weapon upgrade ideas
   damage up
   attack speed
   gun types
-    forward gun 100% potency
-    homing gun 33% potency
-    wild gun 150% potency
-    spread gun 10% potency
+    Forward Torpedo 100% potency 100% velocity
+    homing gun 40% potency 50-75% velocity
+    wild gun 160% potency 50% velocity
+    spread gun 10% potency 40% velocity
 
 
 
