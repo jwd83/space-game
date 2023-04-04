@@ -70,6 +70,7 @@ class UpgradeType:
     MaxHealth = 6
     DodgeCooldown = 7
     ArmorUp = 8
+    LifeSteal = 9
 
 # enumerate the projectile types
 class ProjectileType:
@@ -206,6 +207,13 @@ upgrades = [
         'info_1': 'Increases your armor',
         'info_2': 'causing you to take',
         'info_3': 'less damage.',
+        'color': GREEN
+    },
+    {
+        'name': 'Life Steal',
+        'info_1': 'Converts a portion',
+        'info_2': 'of your damage into',
+        'info_3': 'health for you.',
         'color': GREEN
     }
 
@@ -722,6 +730,8 @@ def process_upgrade(upgrade_type: UpgradeType):
             player.add_weapon(ProjectileType.Homing)
         case UpgradeType.ArmorUp:
             player.defense_level += 1
+        case UpgradeType.LifeSteal:
+            player.life_steal += 5
         case _:
             pass
 
@@ -1119,6 +1129,11 @@ def collide():
                     projectile.hit = True
                     if trash_mob.hp <= 0:
                         trash_mobs.remove(trash_mob)
+
+            # if the projectile is now a hit perform life steal if the player
+            # has a life steal upgrade
+            if projectile.hit and player.life_steal > 0:
+                player.hp += math.ceil(projectile.damage * (player.life_steal / 100))
 
     # collide boss projectiles with the player
     for projectile in boss_projectiles:
@@ -1557,7 +1572,8 @@ def run_victory_screen():
                 UpgradeType.WildTorpedo,
                 UpgradeType.MaxHealth,
                 UpgradeType.DodgeCooldown,
-                UpgradeType.ArmorUp
+                UpgradeType.ArmorUp,
+                UpgradeType.LifeSteal,
             ]
             random.shuffle(upgrade_offers)
             load_boss()
@@ -2053,6 +2069,7 @@ player.hp = player.max_hp
 player.x = 100
 player.deaths = 0
 player.score = 0
+player.life_steal = 0
 player.add_weapon(ProjectileType.ForwardTorpedo)
 
 boss = Ship("ships/ships_3.png", 1, 1, 310, 150, (38, 37, 37), 1)

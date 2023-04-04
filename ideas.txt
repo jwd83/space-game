@@ -15,4 +15,4 @@ defensive upgrades
   health up
   dodge cdr
   dodge itime up
-
+  lifesteal
