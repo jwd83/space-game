@@ -1594,7 +1594,7 @@ def load_boss():
     enemy_units = []
 
     # select the boss and name it
-    boss_divisor = 13
+    boss_divisor = 14
     sprite_selector = boss.level % boss_divisor
 
     boss_name_mark = 0
@@ -1673,6 +1673,14 @@ def load_boss():
         boss.change_sprite("ships/Behemoth.gif", 0, 0,
                            190, 96, None, 1)
         boss.flip_h()
+
+    elif sprite_selector == 13:
+
+        boss.name = "Windows XP"
+        boss.change_sprite("ships/windoze.png", 0, 0,
+                           1364, 1203, None, 0.25)
+        boss.flip_h()
+
 
     boss.mask = pygame.mask.from_surface(boss.sprite)
 
@@ -2153,6 +2161,9 @@ while not done:
             done = True
         case GameState.Ending:
             run_ending_screen()
+        case _:
+            print("Unknown game state: " + str(game_state))
+            done = True
 
     # increment the frame counter
     frame_counter += 1
