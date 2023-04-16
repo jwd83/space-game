@@ -15,7 +15,7 @@
 # xbox 360 controller notes
 
 # get_button maplike
-# A button - 0   (defense upgrade/dodge)
+# A button - 0   (defense upgrade/deflect)
 # B button - 1
 # X button - 2   (shoot)
 # Y button - 3   (weapon upgrade/??)
@@ -68,7 +68,7 @@ class UpgradeType:
     HomingTorpedo = 4
     WildTorpedo = 5
     MaxHealth = 6
-    DodgeCooldown = 7
+    DeflectCooldown = 7
     ArmorUp = 8
     LifeSteal = 9
 
@@ -98,11 +98,13 @@ attack_power = 5
 background_speed = 1.0
 base_fps = 60
 cooldown_attack = 0.1
-cooldown_dodge = 2.5
+cooldown_deflect = 2.5
 damage_done = 0
 dps = 0
 dt = 1.0
+duration_deflect = 1
 fps = 60
+time_frame_start = time.time()
 frame_counter = 0
 frame_last_shot = 0
 game_state = last_game_state = GameState.Title
@@ -112,7 +114,7 @@ ship_speed = 9
 starfield_size = 300
 state_start_frame = 0
 state_start_time = time.time()
-time_last_dodge = 0
+time_last_deflect = 0
 time_last_attack = 0
 volume: int = 10
 width = 1280
@@ -196,10 +198,10 @@ upgrades = [
         'color': GREEN
     },
     {
-        'name': 'Dodge Cooldown',
+        'name': 'Deflect Cooldown',
         'info_1': 'Decreases the cooldown',
-        'info_2': 'between dodges allowing',
-        'info_3': 'you to dodge more often.',
+        'info_2': 'between deflects allowing',
+        'info_3': 'you to deflect more often.',
         'color': GREEN
     },
     {
@@ -651,7 +653,7 @@ def move_projectiles():
 
 
 def handle_game_inputs():
-    global player, time_last_dodge, time_last_attack
+    global player, time_last_deflect, time_last_attack
 
     # reset ship motion
     player.vx = 0
@@ -661,7 +663,7 @@ def handle_game_inputs():
     keys = pygame.key.get_pressed()
 
     joy_shoot = False
-    joy_dodge = False
+    joy_deflect = False
     joy_up = False
     joy_down = False
     joy_left = False
@@ -670,7 +672,7 @@ def handle_game_inputs():
     # check for joystick input
     if joystick is not None:
         if joystick.get_button(0):
-            joy_dodge = True
+            joy_deflect = True
         if joystick.get_button(2):
             joy_shoot = True
         dpad_x, dpad_y = joystick.get_hat(0)  # no idea if this is right
@@ -691,21 +693,17 @@ def handle_game_inputs():
         player.vy -= ship_speed
     if keys[pygame.K_DOWN] or keys[pygame.K_s] or joy_down:
         player.vy += ship_speed
-    if keys[pygame.K_TAB] or joy_dodge:
-        if time.time() - time_last_dodge > cooldown_dodge:
-            time_last_dodge = time.time()
-            if player.vx == 0 and player.vy == 0:
-                player.vx += ship_speed
-            player.vx *= 25 * dt
-            player.vy *= 25 * dt
+    if keys[pygame.K_TAB] or joy_deflect:
+        if time_frame_start - time_last_deflect > cooldown_deflect:
+            time_last_deflect = time_frame_start
 
     if keys[pygame.K_SPACE] or joy_shoot:
-        if time.time() - time_last_attack > cooldown_attack:
-            time_last_attack = time.time()
+        if time_frame_start - time_last_attack > cooldown_attack:
+            time_last_attack = time_frame_start
             player_shoot()
 
 def process_upgrade(upgrade_type: UpgradeType):
-    global attack_power, cooldown_dodge, cooldown_attack, player, upgrade_path
+    global attack_power, cooldown_deflect, cooldown_attack, player, upgrade_path
 
     print(upgrade_type)
     card_upgrade = upgrades[upgrade_type-1]
@@ -718,8 +716,8 @@ def process_upgrade(upgrade_type: UpgradeType):
         case UpgradeType.MaxHealth:
             player.max_hp = int(player.max_hp * 1.66667)
             player.hp = player.max_hp
-        case UpgradeType.DodgeCooldown:
-            cooldown_dodge -= 0.1
+        case UpgradeType.DeflectCooldown:
+            cooldown_deflect -= 0.1
         case UpgradeType.AttackSpeed:
             cooldown_attack *= 0.9
         case UpgradeType.ForwardTorpedo:
@@ -1106,6 +1104,8 @@ def projectile_hits_ship(projectile, ship):
 
 def collide():
     global damage_done
+
+
     for projectile in player_projectiles:
         # check if the projectile x y is within the boss x y + w h
         #        if(projectile.x > boss.x and projectile.x < boss.x + boss.w * boss.scale and projectile.y > boss.y and projectile.y < boss.y + boss.h * boss.scale):
@@ -1146,10 +1146,28 @@ def collide():
                 if projectile.damage < 0:
                     pygame.mixer.Sound.play(sfx['player_heal'])
                 else:
-                    pygame.mixer.Sound.play(sfx['boss_hit'])
-                    projectile.damage -= player.defense_level
-                    projectile.damage = constrain(projectile.damage, 1, None)
-                    player.frame_last_hit = frame_counter
+                    # check if the player has a deflect active
+                    if time_frame_start - time_last_deflect < duration_deflect:
+                        projectile.damage = 0
+                        pygame.mixer.Sound.play(sfx['deflect'])
+                        # create a new projectile that is a player projectile with reversed direction
+                        player_projectiles.append(
+                            fire_projectile(
+                                player,
+                                boss,
+                                3,
+                                int(attack_power * 2),
+                                PURPLE,
+                                6,
+                                20
+                            )
+                        )
+
+                    else:
+                        pygame.mixer.Sound.play(sfx['boss_hit'])
+                        projectile.damage -= player.defense_level
+                        projectile.damage = constrain(projectile.damage, 1, None)
+                        player.frame_last_hit = frame_counter
 
                 player.hp -= projectile.damage
 
@@ -1258,6 +1276,21 @@ def draw_screen():
     # draw the ship
     player.draw()
 
+    # if the player is deflecting draw the deflect shield
+    if time_frame_start - time_last_deflect < duration_deflect:
+        pct = (time_frame_start - time_last_deflect) / duration_deflect
+        pct = constrain(pct, 0, 1)
+        pygame.draw.circle(
+            screen,
+            PURPLE,
+            (player.x + player.w * player.scale / 2,
+             player.y + player.h * player.scale / 2),
+            player.w * player.scale * (1-pct),
+            3
+        )
+
+
+
     # draw the boss
     boss.draw()
 
@@ -1268,38 +1301,17 @@ def draw_screen():
     # draw the projectiles
     draw_projectiles()
 
-    draw_hp_bar(RED, boss)
-    draw_hp_bar(GREEN, player)
+    draw_bar(player, 0, player.hp, player.max_hp, GREEN, YELLOW)                        # player health
+    draw_bar(player, 1, player.hp - player.max_hp, player.max_hp, BLUE, YELLOW, True)   # player shield (if hp > max_hp)
+    if time_frame_start - time_last_deflect < cooldown_deflect:
+        draw_bar(player, 2, time_frame_start - time_last_deflect, cooldown_deflect, PURPLE, YELLOW)
+
+    draw_bar(boss, 0, boss.hp, boss.max_hp, RED, YELLOW)                                # boss health
+
     for trash_mob in trash_mobs:
+        draw_bar(trash_mob, 0, trash_mob.hp, trash_mob.max_hp, BLUE, YELLOW)
         draw_hp_bar(BLUE, trash_mob)
 
-    # draw the dodge cool down above the player if dodge is on cooldown
-    dodge_ready = (time.time() - time_last_dodge) / cooldown_dodge
-    if dodge_ready < 1:
-        pygame.draw.rect(
-            screen,
-            PURPLE,
-            (
-                player.x,
-                player.y + player.h * player.scale + 11,
-                (player.w * player.scale) * dodge_ready,
-                2
-            )
-        )
-
-    # draw the players shield level bar on the screen below the player
-    if player.hp > player.max_hp:
-        pygame.draw.rect(
-            screen,
-            BLUE,
-            (
-                player.x,
-                player.y + player.h * player.scale + 11,
-                (player.w * player.scale) *
-                ((player.hp - player.max_hp) / player.max_hp),
-                10
-            )
-        )
 
     draw_score_line()
 
@@ -1342,6 +1354,40 @@ def draw_score_line():
 
     screen.blit(text_score_line, (0, 680))
     screen.blit(text_status_line, (0, 680+text_score_line.get_height()))
+
+
+def draw_bar(ship, position, value_current, value_max, foreground_color, background_color = YELLOW, background_transparent: bool = False, bar_height = 8):
+
+    bar_top_left_x = ship.x
+    bar_top_left_y = ship.y + (ship.h * ship.scale) + (position * (bar_height + 2))
+    bar_background_width = ship.w * ship.scale
+    bar_foreground_width = constrain(value_current, 0, value_max) / value_max * bar_background_width
+
+    # draw the background
+    if not background_transparent:
+        pygame.draw.rect(
+            screen,
+            background_color,
+            (
+                bar_top_left_x,
+                bar_top_left_y,
+                bar_background_width,
+                bar_height,
+            )
+        )
+
+    # draw the background
+    pygame.draw.rect(
+        screen,
+        foreground_color,
+        (
+            bar_top_left_x,
+            bar_top_left_y,
+            bar_foreground_width,
+            bar_height,
+        )
+    )
+
 
 
 def draw_hp_bar(color, ship):
@@ -1396,9 +1442,9 @@ def run_title_screen():
                 (width / 2 - text_title_start.get_width()/2,
                  height / 2 - text_title_start.get_height()/2))
 
-    screen.blit(text_title_dodge,
-                (width / 2 - text_title_dodge.get_width()/2,
-                 height / 2 - text_title_dodge.get_height()/2 + 50))
+    screen.blit(text_title_deflect,
+                (width / 2 - text_title_deflect.get_width()/2,
+                 height / 2 - text_title_deflect.get_height()/2 + 50))
 
     screen.blit(controls, (width / 2 - controls.get_width() / 2, 400))
 
@@ -1571,7 +1617,7 @@ def run_victory_screen():
                 UpgradeType.HomingTorpedo,
                 UpgradeType.WildTorpedo,
                 UpgradeType.MaxHealth,
-                UpgradeType.DodgeCooldown,
+                UpgradeType.DeflectCooldown,
                 UpgradeType.ArmorUp,
                 UpgradeType.LifeSteal,
             ]
@@ -1631,7 +1677,7 @@ def load_boss():
     elif sprite_selector == 5:
         boss.name = "Rathtar Overlord"
         boss.change_sprite("ships/plantboy.gif", 0, 0,
-                           126, 94, None, 1)
+                           126, 94, None, 1.5)
         boss.flip_h()
 
     elif sprite_selector == 6:
@@ -1652,7 +1698,7 @@ def load_boss():
     elif sprite_selector == 9:
         boss.name = "Zone Eater"
         boss.change_sprite("ships/zone-eater.gif", 0, 0,
-                           190, 144, None, 1)
+                           190, 144, None, 1.5)
         boss.flip_h()
 
     elif sprite_selector == 10:
@@ -1671,14 +1717,14 @@ def load_boss():
 
         boss.name = "Alexander"
         boss.change_sprite("ships/Behemoth.gif", 0, 0,
-                           190, 96, None, 1)
+                           190, 96, None, 1.25)
         boss.flip_h()
 
     elif sprite_selector == 13:
 
         boss.name = "Windows XP"
         boss.change_sprite("ships/windoze.png", 0, 0,
-                           1364, 1203, None, 0.25)
+                           1364, 1203, None, 0.2)
         boss.flip_h()
 
 
@@ -1989,8 +2035,8 @@ text_threat_detected = font.render(
     "THREAT DETECTED !! Sensors indicate...", True, (255, 255, 255), (255,0,0))
 text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
-text_title_dodge = font_large.render(
-    '[tab] TO DODGE', True, (0, 255, 255))
+text_title_deflect = font_large.render(
+    '[tab] TO DEFLECT', True, (0, 255, 255))
 
 text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
 text_ship_destroyed = font_large.render('SHIP DESTROYED!', True, (255, 0, 0))
@@ -2015,6 +2061,7 @@ sfx = {
     "comm_fox": pygame.mixer.Sound('sounds/comm-fox.ogg'),
     "comm_frog": pygame.mixer.Sound('sounds/comm-frog.ogg'),
     "level_up": pygame.mixer.Sound('sounds/level_up.wav'),
+    "deflect": pygame.mixer.Sound('sounds/deflect.wav'),
 }
 
 # make a dictionary of various space images
@@ -2189,6 +2236,8 @@ while not done:
 
     # limit to 60 frames per second
     dt = clock.tick(fps) / 1000
+    time_frame_start = time.time()
+
 
 # quit pygame and clean up
 pygame.quit()
