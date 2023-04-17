@@ -1640,7 +1640,7 @@ def load_boss():
     enemy_units = []
 
     # select the boss and name it
-    boss_divisor = 14
+    boss_divisor = 15
     sprite_selector = boss.level % boss_divisor
 
     boss_name_mark = 0
@@ -1714,13 +1714,19 @@ def load_boss():
         boss.flip_h()
 
     elif sprite_selector == 12:
+        boss.name = "Zombie Villager"
+        boss.change_sprite("ships/zombieeeeeee.png", 0, 0,
+                           146, 256, None, 1)
+
+
+    elif sprite_selector == 13:
 
         boss.name = "Alexander"
         boss.change_sprite("ships/Behemoth.gif", 0, 0,
                            190, 96, None, 1.25)
         boss.flip_h()
 
-    elif sprite_selector == 13:
+    elif sprite_selector == 14:
 
         boss.name = "Windows XP"
         boss.change_sprite("ships/windoze.png", 0, 0,
