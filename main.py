@@ -97,6 +97,7 @@ class GameState:
 attack_power = 5
 background_speed = 1.0
 base_fps = 60
+cheats_enabled = False
 cooldown_attack = 0.1
 cooldown_deflect = 2.5
 damage_done = 0
@@ -1448,6 +1449,15 @@ def run_title_screen():
 
     screen.blit(controls, (width / 2 - controls.get_width() / 2, 400))
 
+    screen.blit(
+        text_title_copyright,
+        (
+            (width / 2 - text_title_copyright.get_width() / 2),
+            600
+         )
+    )
+
+
     draw_heading()
 
     # check for key press of space
@@ -1907,21 +1917,28 @@ def run_level_up_screen():
     elif keys[pygame.K_4]:
         proceed = True
         process_upgrade(upgrade_offers[3])
-    elif keys[pygame.K_q]:
-        # cheat code 'q' to level up all upgrades
-        process_upgrade(upgrade_offers[0])
-        process_upgrade(upgrade_offers[1])
-        process_upgrade(upgrade_offers[2])
-        process_upgrade(upgrade_offers[3])
-        proceed = True
-    elif keys[pygame.K_9]:
-        # cheat code '9' to level up all upgrades
-        process_upgrade(upgrade_offers[0])
-        process_upgrade(upgrade_offers[1])
-        process_upgrade(upgrade_offers[2])
-        process_upgrade(upgrade_offers[3])
-        game_state = GameState.Ending
-
+    elif cheats_enabled:
+        if keys[pygame.K_q]:
+            # cheat code 'q': to level up all upgrades
+            process_upgrade(upgrade_offers[0])
+            process_upgrade(upgrade_offers[1])
+            process_upgrade(upgrade_offers[2])
+            process_upgrade(upgrade_offers[3])
+            proceed = True
+        elif keys[pygame.K_9]:
+            # cheat code '9': take all upgrades, skip to credits
+            process_upgrade(upgrade_offers[0])
+            process_upgrade(upgrade_offers[1])
+            process_upgrade(upgrade_offers[2])
+            process_upgrade(upgrade_offers[3])
+            game_state = GameState.Ending
+        elif keys[pygame.K_r]:
+            boss.level = 15
+            load_boss()
+            proceed = True
+            for i in range(3):
+                for j in upgrade_offers:
+                    process_upgrade(j)
 
 
     # check for a key press of either enter or tab to start the next level
@@ -2019,6 +2036,10 @@ def change_volume():
 # main entry point for the game
 ###############################################################################
 
+# check if a .gitignore file exists and enable cheats if it does
+if os.path.isfile('.gitignore'):
+    cheats_enabled = True
+
 # start the game
 print("Starting game...")
 pygame.init()
@@ -2043,6 +2064,7 @@ text_title_start = font_large.render(
     '[space] TO SHOOT', True, (0, 255, 255))
 text_title_deflect = font_large.render(
     '[tab] TO DEFLECT', True, (0, 255, 255))
+text_title_copyright = font.render("Copyright (c) Jack Games 1998", True, (240,240,240))
 
 text_quit_key = font_large.render('[escape] TO QUIT', True, (255, 255, 255))
 text_ship_destroyed = font_large.render('SHIP DESTROYED!', True, (255, 0, 0))
